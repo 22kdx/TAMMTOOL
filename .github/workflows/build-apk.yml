@@ -81,6 +81,8 @@ jobs:
           gradle :app:assembleDebug --stacktrace --info >> ci-build.log 2>&1
           BUILD_EXIT=$?
           echo "=== BUILD EXIT CODE: $BUILD_EXIT ===" >> ci-build.log
+          echo "=== Build output directory contents ===" >> ci-build.log
+          find app/build -type f 2>/dev/null | head -30 >> ci-build.log || echo "No build output files found" >> ci-build.log
           echo "BUILD_EXIT=$BUILD_EXIT" >> $GITHUB_ENV
 
       - name: Save build log to repository (always)

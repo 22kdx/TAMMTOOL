@@ -452,3 +452,9 @@ grep -n "room\." apps/marketer/app/build.gradle.kts   # يجب أن يبقى sch
 
 **ولم أنفّذ ما يبقى في ر6** (حذف `arg("room.generateKotlin","true")` من التطبيقين) لأنه يمسّ `apps/`؛
 هو سطر واحد إن أردته مني في كوميت مستقل.
+
+**دليل من الـ runner (وليس من sandbox)**: تشغيل `42281343268` على `ubuntu-24.04` بعد دفع الأدوات —
+خطوة `Self-test` = **success**، أي أن فحوص `tools/` الثلاثة والأربعين (ومعها 89 فحص سكربتات)
+نجحت على بيئة نظيفة حقيقية، لا عندي فقط. وما زال الفشل الوحيد في `Build debug APK` هو
+`room.generateKotlin can only be enabled in KSP` — لا صنف خطأ جديد من إضافاتي (تأكدت من الـ annotations
+كاملة: 26 تعليقاً، كلها من السبب نفسه)، وبقي الحذف عندك.

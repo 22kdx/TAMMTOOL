@@ -11,8 +11,7 @@ import com.tammtool.marketerapp.data.model.*
         MarketerUser::class, MarketerOrder::class, MarketerCommission::class,
         MarketerNotification::class, AuditLog::class
     ],
-    version = 1,
-    exportSchema = true
+    version = 1
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun marketerUserDao(): MarketerUserDao

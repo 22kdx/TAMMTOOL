@@ -30,15 +30,6 @@
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".util.SmsReceiverService"
-            android:exported="true"
-            android:permission="android.permission.BIND_SMS_RECEIVER">
-            <intent-filter>
-                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
-            </intent-filter>
-        </service>
-
     </application>
 
 </manifest>

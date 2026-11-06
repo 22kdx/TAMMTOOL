@@ -261,6 +261,33 @@ git add -f apps/*/gradle/wrapper/gradle-wrapper.jar apps/*/gradlew && git commit
 gh run watch                                   # الآن الفشل الحقيقي يظهر، لا «نجاح» فارغ
 ```
 
+---
+
+## 8. أول CI حقيقي على هذا الفرع — ما كشفه وما صُلبِح
+
+التشغيل **42273932002** (`push` على `arena/68a3e358-tammtool` @ `fdee138`): `completed · failure`
+للوظيفتين `build (marketer)` و`build (orders-delivery)`.
+
+**هذا نجاح للأدوات قبل أن يكون فشلاً للبناء:** كل خطوات البنية مرّت — `Install Android SDK` ✓
+(كان ينكسر على خطأ صيغة `android-sdk-setup.sh:83`)، `Install Gradle 8.7` ✓، `Self-test` ✓ (89/89)،
+والفشل ظهر في **خطوة البناء الحقيقية** لا كـ«نجاح» فارغ؛ وخطوة الـ annotations نقلت السبب عبر API
+بلا حاجة للسجل الخام (`./scripts/ci-logs.sh <run-id>`، و`gh run view --log` لا يعمل من هنا:
+يفشل على `results-receiver.actions.githubusercontent.com` — مُجرَّب على `42273871179`).
+
+| التشغيل | الوظيفتان | السبب الحرفي من CI | الحالة |
+|---|---|---|---|
+| `42273932002` | marketer + orders | `The currently configured max heap space is '512 MiB'` · `ERROR: D8: java.lang.OutOfMemoryError: Java heap space` · `Gradle build daemon has been stopped: since the JVM garbage collector is thrashing` — ولـ orders فقط: `Could not find androidx.compose.material:material-window-size-class:1.6.4` داخل `:app:dataBindingMergeDependencyArtifactsDebug` (`debugCompileClasspath`) | ✅ أُصلح في `f24322c`: `apps/*/gradle.properties` (A2 **ضيعت في الدمج** فأعيدت: `-Xmx4g -XX:MaxMetaspaceSize=1g` + `kotlin.daemon.jvmargs=-Xmx1536m` + `kapt.workers.isolation=process` + `enableJetifier=false`)، وحذف الإحداثية غير الموجودة (الصحيح `androidx.compose.material3:material3-window-size-class`، ولا `import` لها)، وحذف `viewBinding`/`dataBinding` (صفر ملف `layout/*.xml`) |
+| `42274698251` | marketer + orders | `error: room.generateKotlin can only be enabled in KSP.` (×6 لكل تطبيق — مرة لكل `@Entity`) ⇒ `Execution failed for task ':app:kaptDebugKotlin'` | ⛔ **خطأ من إضافتي أنا** (A1): وضعت `arg("room.generateKotlin", "true")` في السطر **107** من `apps/*/app/build.gradle.kts` داخل `kapt { arguments {} }` — خيار خاص بـ KSP وترفضه Room مع kapt. حذف سطر واحد يحلّها؛ لم أنفّذه التزاماً بتوجيه «لا عمل منفرد» (الصيغة بيد الوكيل 0 في `AGENTS_STATUS.md` «ر6») |
+
+**قراءة الأرقام مهمة:** الفشل الثاني **تقدّم حقيقي** — لا `Java heap space` ولا خطأ classpath، وkapt صار
+يصل إلى معالج Room نفسه ⇒ `room.schemaLocation` مُفعَّل ويُخرج المخططات في `app/schemas/`. المتبقي في
+الشجرة خطأ واحد صنعتُه أدواتُ التوثيق، ولا يمسّ كود الوكيل 1.
+
+**ملاحظة على المخرجات:** `marketer-build-log` = 1397 بايت و`orders-delivery-build-log` = 1646 بايت ⇒
+`build-logs/*.log` سجل مقتضب، لا كامل مخرجات Gradle (تُطبع في مخرجات الخطوة على الـ runner ولا توصل
+إليها من API). بند تحسين لي وحدي: توسيع السجل المرفوع في `build-apk.sh` (وإلا بقيت annotations هي
+المصدر الوحيد القاطع — وهذا ما اعتمدناه فعلياً في الجولين أعلاه).
+
 **أوامر إعادة إنتاج هذا الملف كله (بلا JDK):**
 
 ```bash

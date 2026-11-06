@@ -10,7 +10,7 @@ class ProductRepository(private val productDao: ProductDao) {
     suspend fun getById(id: Int): Product? = productDao.getById(id)
     suspend fun deactivate(id: Int) = productDao.deactivate(id)
 
-    fun getAllActiveFlow(): Flow<List<Product>> = productDao.getAllActiveFlow()
-    fun getAllGiftsFlow(): Flow<List<Product>> = productDao.getAllGiftsFlow()
+    fun getAllActiveFlow(): Flow<List<Product>> = productDao.getAllActive()
+    fun getAllGiftsFlow(): Flow<List<Product>> = productDao.getAllGifts()
     fun getAllFlow(): Flow<List<Product>> = productDao.getAll()
 }

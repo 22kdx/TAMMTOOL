@@ -18,18 +18,18 @@ interface InventoryDao {
     fun getAll(): Flow<List<InventoryMovement>>
 
     @Query("""
-        SELECT product_id, SUM(CASE WHEN movement_type = 'IN' THEN quantity 
-             WHEN movement_type = 'MISSION_ASSIGN' THEN -quantity 
-             WHEN movement_type = 'OUT' THEN -quantity 
-             WHEN movement_type = 'MISSION_RETURN' THEN quantity 
+        SELECT product_id, SUM(CASE WHEN movement_type = 'IN' THEN quantity
+             WHEN movement_type = 'MISSION_ASSIGN' THEN -quantity
+             WHEN movement_type = 'OUT' THEN -quantity
+             WHEN movement_type = 'MISSION_RETURN' THEN quantity
              ELSE 0 END) as net_quantity
-        FROM inventory_movements 
+        FROM inventory_movements
         GROUP BY product_id
     """)
     fun getStockSummary(): Flow<List<StockSummary>>
 
     data class StockSummary(
-        val productId: Int,
-        val netQuantity: Int
+        @androidx.room.ColumnInfo(name = "product_id") val productId: Int,
+        @androidx.room.ColumnInfo(name = "net_quantity") val netQuantity: Int
     )
 }

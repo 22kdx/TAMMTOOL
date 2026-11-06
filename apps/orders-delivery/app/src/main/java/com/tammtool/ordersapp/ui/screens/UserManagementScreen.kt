@@ -1,8 +1,15 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.tammtool.ordersapp.ui.screens
+
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.Alignment
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -14,7 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
 fun UserManagementScreen(viewModel: UserViewModel = hiltViewModel()) {
-    val users by viewModel.users.collectAsState(initial = emptyList())
+    val users by viewModel.users.observeAsState(initial = emptyList())
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -43,7 +50,7 @@ fun UserManagementScreen(viewModel: UserViewModel = hiltViewModel()) {
 private fun UserCard(user: User) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(8.dp),
-        elevation = 2.dp
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -54,9 +61,9 @@ private fun UserCard(user: User) {
                 Text(text = user.phone, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(modifier = Modifier.weight(1f))
-            Chip(
+            SuggestionChip(onClick = {},
                 label = { Text(user.role.name) },
-                colors = ChipDefaults.colors(
+                colors = SuggestionChipDefaults.suggestionChipColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             )

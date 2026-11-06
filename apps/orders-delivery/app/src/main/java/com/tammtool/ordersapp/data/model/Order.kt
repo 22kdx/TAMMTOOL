@@ -11,24 +11,24 @@ import kotlinx.serialization.Serializable
 @Entity(
     tableName = "orders",
     indices = [
-        Index(value = ["orderNumber"], unique = true),
+        Index(value = ["order_number"], unique = true),
         Index(value = ["status"]),
-        Index(value = ["courierId"]),
-        Index(value = ["marketerId"]),
-        Index(value = ["customerPhone"]),
-        Index(value = ["createdAt"])
+        Index(value = ["courier_id"]),
+        Index(value = ["marketer_id"]),
+        Index(value = ["customer_phone"]),
+        Index(value = ["created_at"])
     ],
     foreignKeys = [
         ForeignKey(
             entity = User::class,
             parentColumns = ["id"],
-            childColumns = ["courierId"],
+            childColumns = ["courier_id"],
             onDelete = ForeignKey.SET_NULL
         ),
         ForeignKey(
             entity = User::class,
             parentColumns = ["id"],
-            childColumns = ["marketerId"],
+            childColumns = ["marketer_id"],
             onDelete = ForeignKey.SET_NULL
         )
     ]

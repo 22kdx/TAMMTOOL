@@ -25,8 +25,8 @@ interface FinancialTransactionDao {
     fun getAllPending(): Flow<List<FinancialTransaction>>
 
     @Query("""
-        SELECT SUM(CASE WHEN transaction_type = 'CREDIT' THEN amount ELSE -amount END) as net_balance
-        FROM financial_transactions 
+        SELECT COALESCE(SUM(CASE WHEN transaction_type = 'CREDIT' THEN amount ELSE -amount END), 0.0) as net_balance
+        FROM financial_transactions
         WHERE wallet_id = :walletId AND status = 'APPROVED'
     """)
     suspend fun getNetBalance(walletId: Int): Double

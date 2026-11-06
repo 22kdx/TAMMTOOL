@@ -1,5 +1,7 @@
 package com.tammtool.ordersapp.ui.viewmodel
 
+import kotlinx.coroutines.flow.first
+
 import androidx.lifecycle.*
 import com.tammtool.ordersapp.data.repository.UserRepository
 import com.tammtool.ordersapp.data.model.User

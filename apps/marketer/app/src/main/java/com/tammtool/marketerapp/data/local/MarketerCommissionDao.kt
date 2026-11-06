@@ -21,7 +21,7 @@ interface MarketerCommissionDao {
     @Query("SELECT * FROM marketer_commissions WHERE status = :status ORDER BY created_at DESC")
     fun getByStatus(status: MarketerCommission.CommissionStatus): Flow<List<MarketerCommission>>
 
-    @Query("SELECT SUM(amount) FROM marketer_commissions WHERE status = :status")
+    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM marketer_commissions WHERE status = :status")
     suspend fun getTotalByStatus(status: MarketerCommission.CommissionStatus): Double
 
     @Query("UPDATE marketer_commissions SET status = 'PAID', paid_at = :paidAt WHERE id = :id")

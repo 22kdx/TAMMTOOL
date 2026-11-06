@@ -10,18 +10,18 @@ import kotlinx.serialization.Serializable
 @Serializable
 @Entity(
     tableName = "commissions",
-    indices = [Index(value = ["userId"]), Index(value = ["orderId"]), Index(value = ["status"])],
+    indices = [Index(value = ["user_id"]), Index(value = ["order_id"]), Index(value = ["status"])],
     foreignKeys = [
         ForeignKey(
             entity = User::class,
             parentColumns = ["id"],
-            childColumns = ["userId"],
+            childColumns = ["user_id"],
             onDelete = ForeignKey.CASCADE
         ),
         ForeignKey(
             entity = Order::class,
             parentColumns = ["id"],
-            childColumns = ["orderId"],
+            childColumns = ["order_id"],
             onDelete = ForeignKey.CASCADE
         )
     ]

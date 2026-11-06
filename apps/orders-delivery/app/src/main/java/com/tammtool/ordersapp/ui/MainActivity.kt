@@ -1,5 +1,7 @@
 package com.tammtool.ordersapp.ui
 
+import androidx.compose.ui.Modifier
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,7 +24,7 @@ class MainActivity : ComponentActivity() {
             OrdersTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = androidx.compose.material3.LocalColorScheme.current.background
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
                     val authViewModel: AuthViewModel = hiltViewModel()

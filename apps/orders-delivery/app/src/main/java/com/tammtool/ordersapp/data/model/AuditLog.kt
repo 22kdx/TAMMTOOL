@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 @Entity(
     tableName = "audit_logs",
-    indices = [Index(value = ["changedAt"]), Index(value = ["changedBy"]), Index(value = ["entityType"])]
+    indices = [Index(value = ["changed_at"]), Index(value = ["changed_by"]), Index(value = ["entity_type"])]
 )
 data class AuditLog(
     @PrimaryKey(autoGenerate = true)

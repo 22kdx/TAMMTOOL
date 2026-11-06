@@ -1,4 +1,11 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.tammtool.ordersapp.ui.screens
+
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.Alignment
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -11,7 +18,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
 fun ProfileScreen(authViewModel: AuthViewModel = hiltViewModel()) {
-    val user by authViewModel.user.collectAsState(initial = null)
+    val user by authViewModel.user.observeAsState(initial = null)
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         TopAppBar(

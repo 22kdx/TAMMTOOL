@@ -41,8 +41,8 @@ interface OrderDao {
     fun getAll(): Flow<List<Order>>
 
     @Query("""
-        UPDATE orders 
-        SET status = :status, courier_id = :courierId, 
+        UPDATE orders
+        SET status = :status, courier_id = :courierId,
             delivery_commission = :deliveryCommission, marketer_commission = :marketerCommission,
             updated_at = :updatedAt
         WHERE id = :id
@@ -57,7 +57,7 @@ interface OrderDao {
     )
 
     @Query("""
-        UPDATE orders 
+        UPDATE orders
         SET amount_collected = :amountCollected, amount_collected_image = :imageUri,
             delivered_quantity = :deliveredQuantity, updated_at = :updatedAt
         WHERE id = :id

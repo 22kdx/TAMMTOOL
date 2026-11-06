@@ -42,7 +42,7 @@ class AuthViewModel @Inject constructor(
             if (existing != null) {
                 _error.value = "رقم الهاتف مسجل مسبقاً"
             } else {
-                val id = userRepository.insert(user.copy(passwordHash = password.hash().toString()))
+                val id = userRepository.insert(user)
                 _user.value = user.copy(id = id.toInt())
             }
             _loading.value = false

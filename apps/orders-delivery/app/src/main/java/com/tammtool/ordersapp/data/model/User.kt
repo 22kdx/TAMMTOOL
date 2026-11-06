@@ -15,7 +15,7 @@ import kotlinx.serialization.Serializable
         ForeignKey(
             entity = Governorate::class,
             parentColumns = ["id"],
-            childColumns = ["governorateId"],
+            childColumns = ["governorate_id"],
             onDelete = ForeignKey.SET_NULL
         )
     ]

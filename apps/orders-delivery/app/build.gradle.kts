@@ -1,9 +1,9 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.20"
-    id("com.google.dagger.hilt.android") version "2.50"
-    id("com.google.gms.google-services") version "4.4.2" apply false
+    id("org.jetbrains.kotlin.kapt")
+    id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -34,8 +34,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
@@ -69,6 +69,9 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+
+    implementation("androidx.compose.runtime:runtime-livedata:1.6.4")
+    implementation("androidx.compose.material3:material3:1.2.1")
 
     // Jetpack Compose
     implementation("androidx.activity:activity-compose:1.8.2")

@@ -1,8 +1,11 @@
 package com.tammtool.ordersapp.ui.theme
 
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Color
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable

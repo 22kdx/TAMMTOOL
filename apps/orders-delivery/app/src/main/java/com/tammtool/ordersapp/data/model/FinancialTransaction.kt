@@ -10,12 +10,12 @@ import kotlinx.serialization.Serializable
 @Serializable
 @Entity(
     tableName = "financial_transactions",
-    indices = [Index(value = ["walletId"]), Index(value = ["status"]), Index(value = ["createdAt"])],
+    indices = [Index(value = ["wallet_id"]), Index(value = ["status"]), Index(value = ["created_at"])],
     foreignKeys = [
         ForeignKey(
             entity = User::class,
             parentColumns = ["id"],
-            childColumns = ["walletId"],
+            childColumns = ["wallet_id"],
             onDelete = ForeignKey.CASCADE
         )
     ]

@@ -15,6 +15,6 @@ class UserRepository(private val userDao: UserDao) {
     suspend fun countByRole(role: User.UserRole): Int = userDao.countByRole(role)
 
     fun getByRoleFlow(role: User.UserRole): Flow<List<User>> = userDao.getByRole(role)
-    fun getAllActiveFlow(): Flow<List<User>> = userDao.getAllActiveFlow()
+    fun getAllActiveFlow(): Flow<List<User>> = userDao.getAllActive()
     fun getAllFlow(): Flow<List<User>> = userDao.getAll()
 }

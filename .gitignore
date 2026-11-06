@@ -55,3 +55,18 @@ Desktop.ini
 /apps/*/build/
 /apps/*/.gradle/
 /apps/*/local.properties
+
+# Android SDK (installed by scripts/android-sdk-setup.sh)
+/android-sdk/
+/$HOME/android-sdk/
+android-sdk/
+
+# APK/AAB outputs
+*.apk
+*.aab
+*.apks
+
+# Keystore / signing
+*.keystore
+*.jks
+*.keys

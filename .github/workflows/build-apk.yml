@@ -31,18 +31,55 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Set up Android SDK directory
+      - name: Install Android SDK (Manual via curl)
         run: |
-          mkdir -p $HOME/android-sdk
+          # إعداد مسارات Android SDK
+          mkdir -p $HOME/android-sdk/cmdline-tools
           echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
+          echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x apps/marketer/gradlew
+          # تحميل Android Command Line Tools من خوادم جوجل
+          echo "جاري تحميل Android Command Line Tools..."
+          curl -L --fail --retry 3 --retry-delay 5 \
+            -o $HOME/android-sdk/cmdline-tools.zip \
+            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+
+          # فك الضغط
+          unzip -q -o $HOME/android-sdk/cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools/
+          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+          rm -f $HOME/android-sdk/cmdline-tools.zip
+
+          # قبول التراخيص
+          mkdir -p $HOME/android-sdk/licenses
+          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $HOME/android-sdk/licenses/android-sdk-license
+          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/android-sdk/licenses/android-sdk-license
+          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $HOME/android-sdk/licenses/android-sdk-preview-license
+          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/android-sdk/licenses/android-sdk-preview-license
+
+          # تثبيت الحزم المطلوبة
+          echo "جاري تثبيت platform-tools, platform android-35, build-tools 35.0.0..."
+          yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" > /dev/null 2>&1 || true
+
+          # التحقق من التثبيت
+          $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --version
+
+      - name: Generate Gradle Wrapper
+        working-directory: apps/marketer
+        run: |
+          if [[ ! -x "./gradlew" ]]; then
+            echo "إنشاء Gradle Wrapper..."
+            gradle wrapper --gradle-version 8.5 || true
+          fi
+          chmod +x ./gradlew
 
       - name: Build Debug APK (طلبات الأفغاني)
         working-directory: apps/marketer
-        run: ./gradlew assembleDebug
+        env:
+          ANDROID_HOME: $HOME/android-sdk
+        run: ./gradlew :app:assembleDebug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

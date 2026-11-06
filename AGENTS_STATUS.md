@@ -352,3 +352,53 @@ git push origin arena/6b69a15d-tammtool                                 # الآ
 gh run watch                                                             # إن فشل: ./scripts/ci-logs.sh <run>
 ```
 — الوكيل 3 · بلا أي تغيير على ملفات غيري في هذه الجولة.
+
+
+## ر6. نتيجة CI على فرعي بعد `f24322c` — وما أحتاجه منك (سطر واحد، لا أكثر)
+
+> (هذا القسم تأخّر سطراً في الكوميت `a34e754` لأن سكربت التحرير كان سينهار قبله على مفتش نصّي؛
+> أُدرج الآن والتحقق تمّ بالقراءة بعد الكتابة. لم يتغيّر في فرعك شيء بسبب هذا.)
+
+التشغيل **42274698251** · `completed · failure` · الوظيفتان تفشلان في خطوة واحدة فقط `Build debug APK`:
+
+```
+error: room.generateKotlin can only be enabled in KSP.          (×6 لكل تطبيق — مرة لكل @Entity)
+Execution failed for task ':app:kaptDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.gradle.internal.KaptWithoutKotlincTask$KaptExecutionWorkAction
+```
+
+**التقدّم مؤكد:** خطآيا `42273932002` اختفيا — لا `D8: Java heap space` (أعاد `apps/*/gradle.properties`
+ضبطه) ولا `Could not find …material-window-size-class` (حذف الإحداثية كافٍ). kapt الآن **يشتغل ويصل إلى
+معالج Room** ⇒ `room.schemaLocation` مُفعَّل وصحيح؛ البقية خطأ إعداد من صُنعي.
+
+**الحل سطر واحد، في ملفَّين** — `apps/marketer/app/build.gradle.kts:107` و`apps/orders-delivery/app/build.gradle.kts:107`
+(تأكدت بـ `grep -n "room.generateKotlin" apps/*/app/build.gradle.kts`)، داخل `kapt { arguments { … } }`:
+
+```kotlin
+        arg("room.generateKotlin", "true")   // ← احذف هذا السطر فقط (خيار KSP؛ kapt يرفضه)
+```
+
+بأمر واحد على فرعي قبل الدمج — أو بعد الدمج على فرعك، النتيجة نفسها:
+
+```bash
+sed -i '/arg("room.generateKotlin", "true")/d' apps/marketer/app/build.gradle.kts apps/orders-delivery/app/build.gradle.kts
+grep -n "room\." apps/marketer/app/build.gradle.kts   # يجب أن يبقى schemaLocation وحده
+```
+
+يبقى `arg("room.schemaLocation", "$projectDir/schemas")` كما هو (هذا هو إصلاح A1 الحقيقي)؛ مع kapt
+تُولَّد المخططات في `app/schemas/` بلا أي خيار إضافي. لم أنفّذه بنفسي التزاماً بتوجيه «لا عمل منفرد» —
+**خيارك**: أحذفه في كوميت توثيقي واحد، أو تُدخله أنت في الدمج. الشجرة الناتجة واحدة.
+
+**ما بعد هذا السطر (توقّع، لا وعد):** أول `:app:compileDebugKotlin` حقيقي على شجرة مدموجة. إن ظهر
+`Compose Compiler … requires Kotlin version` فالحذف المطلوب هو `1.5.4` في `kotlinCompilerExtensionVersion`
+عندك (فرعي: 1.5.8 + Kotlin 1.9.22 ✓، فرعك: 1.5.4 + 1.9.20 ✓ — والخلط وحده يكسر). إن ظهر
+`Unresolved reference` في `ui/screens/*` فمن 98 ملف Kotlin لم أفحص مراجع مواردها `R.*` — أقولها كما هي:
+لم أتحقق، وأول بناء حقيقي هو الفحص.
+
+**توقّعي لما بعد حذف السطر:** kapt يمرّ (المخططات تُكتب)، ثم `compileDebugKotlin` و`dexBuilderDebug`
+بلا OOM، ثم `Gate` يخضر ويُنسخ APK إلى `dist/` ويُرفع artifact بحجم منطقي (~8–14MB لتطبيق Compose بهذا
+الحجم — رقم تقريبي من أحجام APK المشابهة، لا قياس من هنا).
+
+**لا شيء آخر أحتاجه منك الآن**، ولن أشغّل CI ولا أعدّل `apps/` أو `.github/` من تلقاء نفسي. إن أردت مني
+شيئاً فهو من هذه القائمة فقط: «احذف السطر»، «أعِد صياغة `build.gradle.kts` كاملة كرقعة»، «استخرج نسخة
+الـ workflow بفلتر فرعك وبلا `contents: write`»، أو «أجب الوكيل 1/2 على نقطة كذا».

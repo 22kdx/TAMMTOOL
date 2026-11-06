@@ -18,30 +18,11 @@ jobs:
           ref: arena/6b69a15d-tammtool
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Test git push to branch
-        run: |
-          echo "PUSH_TEST_$(date +%s)" > push-test.txt
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add push-test.txt
-          git commit -m "Test push $(date)" || echo "COMMIT FAILED"
-          git push origin arena/6b69a15d-tammtool || echo "PUSH FAILED"
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: 17
           distribution: temurin
-
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
 
       - name: Install Android SDK (Manual via curl)
         run: |
@@ -49,7 +30,6 @@ jobs:
           echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
           echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
 
-          echo "جاري تحميل Android Command Line Tools..."
           curl -L --fail --retry 3 --retry-delay 5 \
             -o $HOME/android-sdk/cmdline-tools.zip \
             https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
@@ -64,17 +44,13 @@ jobs:
           echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $HOME/android-sdk/licenses/android-sdk-preview-license
           echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/android-sdk/licenses/android-sdk-preview-license
 
-          echo "جاري تثبيت platform-tools, platform android-35, build-tools 35.0.0..."
           yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0" > /dev/null 2>&1 || true
+            "platform-tools" "platforms;android-35" "build-tools;35.0.0" > /dev/null 2>&1 || true
 
           $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --version
 
       - name: Install Gradle
         run: |
-          echo "جاري تحميل Gradle 8.5..."
           curl -L --fail --retry 3 --retry-delay 5 \
             -o $HOME/gradle-8.5-bin.zip \
             https://services.gradle.org/distributions/gradle-8.5-bin.zip
@@ -87,71 +63,42 @@ jobs:
 
           gradle --version
 
-      - name: Environment check
-        working-directory: apps/marketer
-        env:
-          ANDROID_HOME: $HOME/android-sdk
-        run: |
-          echo "=== JAVA_HOME ==="
-          echo "$JAVA_HOME"
-          echo ""
-          echo "=== ANDROID_HOME ==="
-          echo "$ANDROID_HOME"
-          echo ""
-          echo "=== Java version ==="
-          java -version 2>&1
-          echo ""
-          echo "=== Gradle version ==="
-          gradle --version 2>&1
-          echo ""
-          echo "=== SDK dirs ==="
-          ls -la $ANDROID_HOME/ 2>&1 || echo "ANDROID_HOME dir not found"
-          echo ""
-          echo "=== local.properties ==="
-          cat local.properties 2>&1 || echo "local.properties not found"
-          echo ""
-          echo "=== Files in apps/marketer ==="
-          ls -la
-          echo ""
-          echo "=== Files in apps/marketer/app ==="
-          ls -la app/
-
       - name: Create local.properties
         working-directory: apps/marketer
         run: |
           echo "sdk.dir=$HOME/android-sdk" > local.properties
 
-      - name: Build Debug APK - save log always
+      - name: Build Debug APK - save log
         working-directory: apps/marketer
         env:
           ANDROID_HOME: $HOME/android-sdk
-          GRADLE_HOME: $HOME/gradle-8.5
         run: |
-          echo "=== Starting Gradle build ==="
-          echo "BUILD_START" > $GITHUB_WORKSPACE/ci-build.log
+          echo "=== BUILD START ===" > ci-build.log
+          echo "JAVA_HOME=$JAVA_HOME" >> ci-build.log
+          echo "ANDROID_HOME=$ANDROID_HOME" >> ci-build.log
+          echo "=== RUNNING GRADLE ===" >> ci-build.log
           set +e
-          gradle :app:assembleDebug --stacktrace --info >> $GITHUB_WORKSPACE/ci-build.log 2>&1
+          gradle :app:assembleDebug --stacktrace --info >> ci-build.log 2>&1
           BUILD_EXIT=$?
-          echo "=== Gradle build exit code: $BUILD_EXIT ===" >> $GITHUB_WORKSPACE/ci-build.log
-          echo "BUILD_EXIT=$BUILD_EXIT" >> $GITHUB_ENV
+          echo "=== BUILD EXIT: $BUILD_EXIT ===" >> ci-build.log
+          exit $BUILD_EXIT
 
       - name: Save build log to repository (always)
         if: always()
         run: |
-          echo "=== Current directory ==="
-          pwd
-          echo "=== Files in current directory ==="
-          ls -la
-          echo "=== ci-build.log check ==="
-          if [[ -f ci-build.log ]]; then
-            echo "ci-build.log found, size: $(wc -c < ci-build.log) bytes"
+          echo "=== Files in apps/marketer ==="
+          ls -la apps/marketer/
+          echo ""
+          echo "=== ci-build.log content ==="
+          if [[ -f apps/marketer/ci-build.log ]]; then
+            cat apps/marketer/ci-build.log
           else
-            echo "ci-build.log NOT FOUND - creating placeholder in current dir"
-            echo "NO BUILD OUTPUT - ci-build.log was not created by gradle" > ci-build.log
+            echo "ci-build.log NOT FOUND"
+            echo "NO BUILD OUTPUT" > apps/marketer/ci-build.log
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ci-build.log
+          git add apps/marketer/ci-build.log
           git commit -m "CI build log from run ${{ github.run_id }}" || echo "COMMIT FAILED"
           git push origin arena/6b69a15d-tammtool || echo "PUSH FAILED"
 

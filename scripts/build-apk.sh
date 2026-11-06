@@ -92,7 +92,7 @@ DIST_DIR="$PROJECT_ROOT/dist"
 LOG_DIR="$PROJECT_ROOT/build-logs"
 EXTRA_GRADLE_ARGS=()
 
-# التطبيقات المعروفة مسبقاً (اختصارات) — أي مجلد داخل apps/ أو examples/ يعمل أيضاً
+# التطبيقات المعروفة مسبقاً (اختصارات) — أي مجلد داخل apps/ أو examples/ أو templates/ يعمل أيضاً
 alias_app() {
   case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
     marketer | marketerapp | afghani | afghani-marketer) printf 'marketer' ;;
@@ -174,7 +174,7 @@ usage() {
   lint         فحص Lint                 → :app:lintDebug
 
 اسم التطبيق:
-  marketer  |  orders-delivery  |  أي مجلد داخل apps/ أو examples/  |  all
+  marketer  |  orders-delivery  |  أي مجلد داخل apps/ أو examples/ أو templates/  |  all
 
 أمثلة:
   ./scripts/build-apk.sh                              # debug / marketer
@@ -390,7 +390,7 @@ is_gradle_project_dir() {
 # يطبع أسماء التطبيقات المتاحة (أسماء المجلدات داخل apps/ و examples/)
 discover_apps() {
   local base name found=" "
-  for base in "$PROJECT_ROOT/apps" "$PROJECT_ROOT/examples" "$PROJECT_ROOT/projects"; do
+  for base in "$PROJECT_ROOT/apps" "$PROJECT_ROOT/examples" "$PROJECT_ROOT/projects" "$PROJECT_ROOT/templates"; do
     [[ -d "$base" ]] || continue
     for dir in "$base"/*/; do
       [[ -d "$dir" ]] || continue
@@ -414,7 +414,7 @@ discover_apps() {
 app_root_dir() { # المسار الكامل لمجلد التطبيق
   local name="$1"
   local base
-  for base in "$PROJECT_ROOT/apps" "$PROJECT_ROOT/examples" "$PROJECT_ROOT/projects"; do
+  for base in "$PROJECT_ROOT/apps" "$PROJECT_ROOT/examples" "$PROJECT_ROOT/projects" "$PROJECT_ROOT/templates"; do
     if [[ -f "$base/$name/settings.gradle" || -f "$base/$name/settings.gradle.kts" || -d "$base/$name/app" ]]; then
       printf '%s\n' "$base/$name"
       return 0
@@ -1061,8 +1061,8 @@ find_output_file() {
       ;;
   esac
   [[ -d "$dir" ]] || return 1
-  newest="$(find "$dir" -type f -name "*.$ext" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)"
-  [[ -z "$newest" ]] && newest="$(find "$dir" -type f -name "*.$ext" 2>/dev/null | head -n 1)"
+  newest="$(find "$dir" -type f -name "*.$ext" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2- || true)"
+  [[ -z "$newest" ]] && newest="$(find "$dir" -type f -name "*.$ext" 2>/dev/null | head -n 1 || true)"
   [[ -n "$newest" && -f "$newest" ]] || return 1
   printf '%s\n' "$newest"
 }
@@ -1270,7 +1270,9 @@ build_app() {
 print_env() {
   echo "TAMMTOOL — بيئة البناء المحلية"
   echo "--------------------------------"
-  printf 'التطبيقات المكتشفة  : %s\n' "$(list_apps)"
+  local _apps=""
+  _apps="$(list_apps)"
+  printf 'التطبيقات المكتشفة  : %s\n' "${_apps:-لا شيء — توقّع apps/<app>/settings.gradle(.kts)}"
   printf 'PROJECT_ROOT       : %s\n' "$PROJECT_ROOT"
   printf 'ANDROID_HOME       : %s\n' "${ANDROID_HOME:-غير مضبوط}"
   printf 'TAMM_ANDROID_SDK   : %s\n' "${TAMM_ANDROID_SDK:-غير مضبوط}"
@@ -1279,7 +1281,9 @@ print_env() {
   printf 'gradle (PATH)      : %s\n' "$(command -v gradle || echo 'غير موجود')"
   printf 'adb (PATH)         : %s\n' "$(command -v adb || echo 'غير موجود')"
   printf 'curl / unzip       : %s / %s\n' "$(command -v curl || echo 'غير موجود')" "$(command -v unzip || echo 'غير موجود')"
-  printf 'Gradle wrapper     : %s\n' "$(ls -1 "$PROJECT_ROOT"/apps/*/gradlew "$PROJECT_ROOT"/examples/*/gradlew 2>/dev/null | head -n 3 | tr '\n' ' ' | sed 's/ $//')"
+  local _w=""
+  _w="$(ls -1 "$PROJECT_ROOT"/apps/*/gradlew "$PROJECT_ROOT"/examples/*/gradlew "$PROJECT_ROOT"/templates/*/gradlew 2>/dev/null | head -n 3 | tr '\n' ' ' | sed 's/ $//' || true)"
+  printf 'Gradle wrapper     : %s\n' "${_w:-لا يوجد — سيولّده build-apk.sh عند أول بناء}"
   printf 'كاش ~/.gradle      : %s\n' "$(if [[ -d "$HOME/.gradle" ]]; then echo 'موجود (البناء التالي أسرع)'; else echo 'غير موجود — أول بناء سينزّل الاعتماديات (~2-5 GB)'; fi)"
   printf 'الذاكرة الكلية      : %s\n' "$(awk '/MemTotal/ {printf "%.1f GB", $2/1048576}' /proc/meminfo 2>/dev/null || echo 'غير متاح')"
   printf 'إصدار git          : %s\n' "$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || echo 'غير متاح')"
@@ -1312,7 +1316,7 @@ main() {
     while IFS= read -r line; do
       [[ -n "$line" ]] && apps+=("$line")
     done <<<"$discovered"
-    [[ ${#apps[@]} -gt 0 ]] || die "لم أعثر على أي مشروع Gradle داخل apps/ أو examples/"
+    [[ ${#apps[@]} -gt 0 ]] || die "لم أعثر على أي مشروع Gradle داخل apps/ أو examples/ أو templates/"
   elif [[ -n "$APP_NAME" ]]; then
     local resolved
     resolved="$(alias_app "$APP_NAME")"
@@ -1341,7 +1345,7 @@ main() {
       exit 1
     else
       log_err "لم أعثر على مشاريع Android في هذا المستودع."
-      printf '  توقعت وجود apps/<اسم>/settings.gradle(.kts) أو apps/<اسم>/app/build.gradle(.kts)\n' >&2
+      printf '  توقعت وجود <apps|examples|templates>/<اسم>/settings.gradle(.kts) أو …/app/build.gradle(.kts)\n' >&2
       exit 1
     fi
   fi

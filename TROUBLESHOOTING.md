@@ -1,0 +1,384 @@
+# استكشاف الأخطاء وإصلاحها — TAMMTOOL
+
+> مرجع الأعراض → الأسباب → الحلول لبناء وتشغيل تطبيقَي TAMMTOOL محلياً وفي GitHub Actions.
+> **آخر تحديث:** 2026-11-06 (الوكيل 3 — التوثيق). راجع `BUILD_GUIDE.md` لخطوات البناء.
+
+---
+
+## 0. ابدأ من هنا (دقيقة واحدة)
+
+```bash
+./scripts/build-apk.sh --print-env                    # هل يرَي JDK/SDK/Gradle كما تتوقع؟
+./scripts/build-apk.sh debug marketer --low-memory --no-daemon --yes
+tail -n 60 build-logs/$(ls -1t build-logs | head -1) # آخر سجل بناء (أو افتح الملف كاملاً)
+./scripts/apk-test.sh doctor                           # بيئة الاختبار والأجهزة
+./scripts/apk-test.sh validate --app marketer          # هل الـ APK الناتج سليم أصلاً؟
+```
+
+| العرض | اذهب إلى |
+|---|---|
+| CI أحمر ولا أعرف السبب | §1 |
+| `Java heap space` / `OutOfMemoryError` | §2.1 |
+| `SDK location not found` | §4.1 |
+| `Unsupported class file major version` / `requires Java 17` | §3 |
+| فشل بعد تعديل `build.gradle.kts` (Kotlin/Compose/Hilt) | §5 |
+| `app-release-unsigned.apk` لا يُثبَّت | §6 |
+| `no devices/emulators found` / `unauthorized` | §7 |
+| خطأ غريب على Windows | §8.1 |
+
+---
+
+## 1. حالة CI الحالية — لماذا يفشل البناء؟
+
+### 1.1 السبب المؤكّد (نسخة ff51): **نفاد ذاكرة Gradle — `Java heap space`** ✅
+
+استُخرج هذا من GitHub Checks API (وليس من سجلات `--log` غير المتاحة في البيئات المقيدة):
+
+```
+run 42264822833 · branch arena/ff5110e8-tammtool · job "build"
+  ✗ Build Debug APK
+  annotations:
+    .github:69  Java heap space
+    .github:28  > Task :app:checkKotlinGradlePluginConfigurationErrors
+    .github:31..35  > Task :app:generateDebugResources … :app:parseDebugLocalResources
+    .github:981 Process completed with exit code 1.
+```
+
+**السبب:** `apps/*/gradle.properties` لا يضبط `org.gradle.jvmargs` إطلاقاً:
+
+```properties
+android.useAndroidX=true
+android.enableJetifier=true
+kotlin.code.style=official
+```
+
+فيحصل Daemon Gradle على افتراضات JVM (ربع ذاكرة الجهاز ≈ 1.75GB على `ubuntu-24.04`)،
+وبناءً مع Compose + kapt (Hilt + Room) + DataBinding + Jetifier يحتاج أكثر من ذلك بكثير.
+
+**الحل (ابدأ من هنا — عدّل الملفَين `apps/marketer/gradle.properties` و `apps/orders-delivery/gradle.properties`):**
+
+```properties
+# الذاكرة — يمنع Java heap space في CI وعلى اللابتوبات
+org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8 -XX:+HeapDumpOnOutOfMemoryError
+kotlin.daemon.jvm.options=-Xmx1536m
+kapt.use.worker.api=true
+kapt.workers.isolation=process
+
+# السرعة والتخزين المؤقت
+org.gradle.parallel=true
+org.gradle.caching=true
+org.gradle.configuration-cache=false
+
+# Jetifier ثقيل ولا حاجة له هنا (لا توجد مكتبات support قديمة) — عطّله لتوفير الذاكرة
+android.enableJetifier=false
+android.nonTransitiveRClass=true
+```
+
+> ملاحظة: `android.enableJetifier=true` وحده يضيف دقائق للبناء وذاكرة إضافية، ولا يوجد ما يبرّره
+> في مشروع يعتمد AndroidX بالكامل.
+
+### 1.2 سبب إضافي على فرع agent-1: **إخفاء الفشل الحقيقي** ✅
+
+```
+run 42264967594 · branch arena/6b69a15d-tammtool · job "build"
+  ✓ Build Debug APK - capture output to root log      ← لم يُمرَّر رمز الخروج!
+  ✗ Save build log to repository (always)             ← هنا يموت الـ job
+  - Upload APK artifact                                 (skipped)
+```
+
+أي أن الـ workflow الحالي يفشل **بسبب حفظ السجل** (كتابة `../ci-build.log` خارج مجلد العمل ثم
+`git commit/push`) بينما نتيجة Gradle الحقيقية مفقودة. القاعدة: *لا تجعل خطوة تسجيل السجلات
+تقرّر نتيجة الـ job، ولا تكتب خارج `$GITHUB_WORKSPACE`.*
+
+### 1.3 كيف تقرأ سجلات CI حين يفشل `gh run view --log-failed`
+
+`gh run view --log-failed` يرسل طلباً إلى `results-receiver.actions.githubusercontent.com`
+(غير متاح خلف جدار الشبكة/الوكيل). الثلاثة التالية تعمل عبر `api.github.com` فقط:
+
+```bash
+# ① ما هي الخطوة الفاشلة؟
+gh api repos/22kdx/TAMMTOOL/actions/runs/<RUN_ID>/jobs \
+  --jq '.jobs[].steps[] | select(.conclusion=="failure") | .name'
+
+# ② ماذا قالت الخطوة؟ (التعليقات فيها أسطر الخطأ الفعلية)
+CRI=$(gh api repos/22kdx/TAMMTOOL/actions/runs/<RUN_ID>/jobs --jq '.jobs[0].check_run_url' | sed 's|.*/check-runs/||')
+gh api "repos/22kdx/TAMMTOOL/check-runs/$CRI/annotations" \
+  --jq '.[] | select(.annotation_level=="failure") | "\(.path):\(.start_line) \(.message)"'
+
+# ③ إن رُفع السجل كـ artifact
+gh run download <RUN_ID> --repo 22kdx/TAMMTOOL --name marketer-ci-build-log --dir ./ci-log
+```
+
+ولتجعل هذا متاحاً دائماً، أضف في الـ workflow (قبل خطوة رفع الـ artifact):
+
+```yaml
+      - name: Print build log (so it is visible in the raw log too)
+        if: failure()
+        run: tail -n 300 apps/marketer/ci-build.log || true
+```
+
+### 1.4 بناء محلي يضاهي CI تماماً (لاستنساخ الفشل على جهازك)
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export ANDROID_HOME="$HOME/android-sdk"
+cd apps/marketer
+gradle --no-daemon --console=plain :app:assembleDebug     # نفس أمر CI (Gradle 8.7)
+# أو بالسكربت الذي يفعل ما سبق + يجمع السجل في build-logs/:
+cd ../.. && ./scripts/build-apk.sh debug marketer --no-daemon --yes
+```
+
+---
+
+## 2. أخطاء Gradle
+
+| الرسالة | السبب المرجّح | الحل |
+|---|---|---|
+| `Java heap space` / `GC overhead limit exceeded` | لا `org.gradle.jvmargs` | §1.1 · محلياً: `--low-memory` أو `export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx3g"` |
+| `SDK location not found` | لا `ANDROID_HOME` ولا `local.properties` | §4.1 |
+| `Unsupported class file major version 65/61` | Gradle أقدم من JDK (21/17) | استعمل Gradle 8.7+ أو JDK 17 |
+| `Could not determine the dependencies of task ':app:...'` | تلف كاش أو انقطاع تنزيل | `--refresh` ثم أعد المحاولة بـ `--offline` |
+| `Could not GET 'https://services.gradle.org/...'` | بروكسي/جدار شبكة | `TAMM_GRADLE_BIN=/path/to/gradle` أو انسخ التوزيع إلى `~/.cache/tammtool/gradle` |
+| `BUILD FAILED ... > Task :app:kaptGenerateStubsDebugKotlin` | kapt + وحدات JDK 17 module system | أضف `org.gradle.jvmargs` مع `--add-opens=jdk.compiler/com.sun.tools.javac.{code,comp,file,main,model,processing,tree,util}=ALL-UNNAMED` |
+| `Task 'assembleRelease' not found` | الوحدة ليست `app` أو المشروع بلا وحدة | `./scripts/build-apk.sh --module <اسم> …` أو `--task ":app:tasks"` |
+| `Gradle wrapper missing` / `gradle-wrapper.jar` مفقود | Wrapper غير مرفوع في git | `gradle wrapper --gradle-version 8.7` (السكربت يعرض فعلها تلقائياً) |
+| `daemon will not start` / بطء شديد | daemon عالق | `gradle --stop` ثم `--no-daemon` |
+| `./gradlew: bad substitution` أو `^M: bad interpreter` | CRLF على Windows | §8.1 |
+| `Permission denied` على `./gradlew` | فقد صلاحية التنفيذ (NTFS/WSL) | `chmod +x gradlew` أو `sh ./gradlew` أو `git update-index --chmod=+x gradlew` |
+
+---
+
+## 3. أخطاء JDK / Java
+
+| الرسالة | الحل |
+|---|---|
+| `JAVA_HOME is not set` | `export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64` (Linux) · `export JAVA_HOME=$(/usr/libexec/java_home -v 17)` (macOS) |
+| `Android Gradle plugin requires Java 17 to run. You are currently using Java 11.` | ثبّت Temurin 17 و حدّده: `./scripts/build-apk.sh --jdk /usr/lib/jvm/java-17-openjdk-amd64 debug marketer` |
+| `error: invalid target release: 17` | JDK الفعلي أقدم؛ تحقق: `java -version` و `javac -version` — قد يكون هناك أكثر من JDK |
+| `JAVA_HOME is set to an invalid directory` | `JAVA_HOME` يجب أن يشير إلى جذر JDK (فيه `bin/java`) لا إلى `bin/java` نفسه |
+
+تحقق سريع:
+
+```bash
+java -version && javac -version
+readlink -f "$(command -v java)"          # أين يقود فعلًا؟
+./scripts/build-apk.sh debug marketer --dry-run --yes | head -20   # ماذا سيُستخدم
+```
+
+---
+
+## 4. أخطاء Android SDK
+
+### 4.1 `SDK location not found`
+
+```bash
+export ANDROID_HOME="$HOME/android-sdk"
+export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+# أو مرّر المسار للسكربت (يكتب local.properties تلقائياً):
+./scripts/build-apk.sh debug marketer --sdk /path/to/android-sdk
+```
+
+تحقق: `cat apps/marketer/local.properties` يجب أن يحتوي `sdk.dir=/…/android-sdk`.
+انتبه: `sdk.dir` على Windows يُكتب بمسارات فيها `\` — استخدم `/` (يقبلها AGP):
+`sdk.dir=C:/Users/you/AppData/Local/Android/Sdk`.
+
+### 4.2 أخطاء متكررة أخرى
+
+| الرسالة | الحل |
+|---|---|
+| `Failed to find target with hash string 'android:35'` | `sdkmanager "platforms;android-35"` |
+| `Failed to find Build Tools revision 35.0.0` | `sdkmanager "build-tools;35.0.0"` |
+| `License for package Android SDK Build-Tools … not accepted` | `yes \| sdkmanager --licenses` |
+| `aapt2 … cannot execute binary file` | SDK مثبّت لمعمارية مختلفة (arm64 vs x86_64) — أعد التثبيت بالسكربت |
+| `Android SDK not installed. install-sdk-required` | استخدم `./scripts/build-apk.sh --setup-sdk debug marketer` |
+| `sdkmanager: command not found` | أضف `cmdline-tools/latest/bin` إلى PATH (وليس `tools/bin` القديم) |
+
+**⚠️ معروفة ومؤكّدة في المستودع:** `scripts/android-sdk-setup.sh` على الفروع الحالية
+**لا يعمل إطلاقاً** — السطر 83 يحتوي بقايا تعديل/دمج:
+
+```bash
+<<<<>>> echo "أدوات البناء: $BUILD_TOOLS_VERSION"
+```
+
+`bash -n scripts/android-sdk-setup.sh` يفشل → أي مسار يعتمد عليه يموت فوراً.
+الحل المؤقت: `build-apk.sh` (الإصدار 2.0) **يكتشف تلف السكريبت ويثبّت SDK داخلياً** بنفسه؛
+أو ثبّت SDK بالأوامر في `BUILD_GUIDE.md` §2.7. الحل الدائم: إصلاح السطر 83 (مطلوب من الوكيل 2).
+
+---
+
+## 5. أخطاء Kotlin / AGP / Compose / Hilt / Room
+
+### 5.1 مصفوفة التوافق (ثبّت هذه الأرقام قبل أي تعديل)
+
+| المكوّن | القيمة الآمنة الآن | لماذا |
+|---|---|---|
+| JDK | 17 | مطلوب لـ AGP 8.x |
+| Gradle | 8.7 | تستخدمه CI؛ AGP 8.6 يطلب 8.7+ |
+| AGP (`com.android.tools.build:gradle`) | **8.6.1** | AGP 8.2 مجرّب حتى compileSdk 34 فقط |
+| Kotlin | **1.9.22** | مرتبط بإصدار Compose Compiler |
+| Compose Compiler | **1.5.8** | ↔ Kotlin 1.9.22 (القائمة: release notes لـ `androidx.compose.compiler`) |
+| Hilt | 2.50 | متوافق مع Kotlin 1.9.x + kapt |
+| Room | 2.6.1 | يتطلب kapt/ksp + schema export dir |
+
+أخطاء المواجهة عندما تخرق القاعدة:
+
+| الرسالة | المعنى |
+|---|---|
+| `Inconsistent JVM-target compatibility detected for tasks 'compileDebugJavaWithJavac' (1.8) and 'compileDebugKotlin' (17)` | اجعل `compileOptions.sourceCompatibility/targetCompatibility` تساوي `kotlinOptions.jvmTarget` (كلها 17) |
+| `Compose Compiler Kotlin plugin version (x) is not compatible with the current Kotlin version (y)` | راجع الجدول أعلاه — المواءمة بين `composeOptions.kotlinCompilerExtensionVersion` ونسخة Kotlin |
+| `Could not find method kapt() for arguments […]` | نقص `id("org.jetbrains.kotlin.kapt")` في كتلة `plugins {}` مع استخدام `kapt(…)` في الاعتماديات |
+| `Build was configured to prefer settings repositories over project repositories but repository 'Google' was found in build file` | يوجد `allprojects { repositories { … } }` مع `FAIL_ON_PROJECT_REPOS` في `settings.gradle.kts` — احذف `allprojects` أو غيّر الوضع إلى `PREFER_SETTINGS` |
+| `Plugin with id 'com.google.gms.google-services' not found` | أما أضف `classpath`/plugin management أو احذفه (استخدام Firebase غير مطلوب محلياً) |
+| `cannot find symbol class Hilt_MarketerApp` | kapt لا يعمل (انظر السطران أعلاه) |
+| `warning: The following options were not recognized by any processor: '[room.schemaLocation…]'` | إعداد Room schema غير مضبوط — ليس قاتلاً لكن يزيل التتبع |
+
+**موثّقة على فرع agent-1 (`arena/6b69a15d-tammtool`) وتؤدي لفشل بناء حتمي:**
+
+1. `apps/*/app/build.gradle.kts` تستخدم `kapt(…)` بدون تطبيق `org.jetbrains.kotlin.kapt` ❌
+2. `sourceCompatibility = VERSION_1_8` مع `jvmTarget = "17"` ❌
+3. Kotlin 1.9.20 + Compose Compiler 1.5.4 (المواءمة المطلوبة 1.5.6) ❌
+4. `allprojects { repositories }` في `apps/*/build.gradle.kts` مع `FAIL_ON_PROJECT_REPOS` ❌
+5. `apps/*/app/src/main/res/values/ic_launcher_web.png.placeholder` — ملف غير XML داخل `res/values` ❌
+   (AAPT2 يرفضه؛ حُذف في فرع `ff5110e8` ويبقى موجوداً في `6b69a15d`)
+
+### 5.2 موارد غير XML في `res/` (فشل AAPT2 غريب المظهر)
+
+الرسالة عادة: `ERROR: <file> resource values/…; unexpected file extension` أو `AAPT2 aapt2-… error`.
+القاعدة: داخل `res/values/` **XML فقط**. الملفات المؤقتة ضعها في `assets/` أو خارج `app/src`،
+واحذف أي `.placeholder` (وهو ما يفعله فرع `ff5110e8` في الكوميت «Remove non-XML placeholder…»).
+
+---
+
+## 6. أخطاء التوقيع والإصدار
+
+| الرسالة | الحل |
+|---|---|
+| الناتج اسمه `app-release-unsigned.apk` | لا يوجد `signingConfig` — هذا طبيعي. وقّعه: `./scripts/sign-apk.sh …` ثم ثبّت الملف الموقّع |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` على الهاتف | النسخة المثبتة موقعة بمفتاح آخر: `./scripts/apk-test.sh install … --reinstall` |
+| `V1 signing only` عند الرفع للمتجر | استخدم AAB (`bundle`) ومحاذاة `apksigner --v2-signing-enabled true` |
+| `Keystore file not found` | `sign-apk.sh` ينفّذ `cd` إلى جذر المستودع، فالمسارات النسبية تُحسب من هناك — استخدم مساراً مطلقاً أو `./keystore/release.jks` من الجذر |
+| `keystore password was incorrect` | انتبه لـ `KEYSTORE_PASSWORD` المحفوظ بـ UTF-8/BOM أو لمسارات `$` في shell |
+| `APK Signature Version 2 is required` | وقّع بـ apksigner (وليس jarsigner) |
+| رفع APK إلى Play ورسالة “Debug build” | لا ترفع نسخة debug — استخدم `bundle` موقّعاً |
+
+اختبار سريع قبل الرفع للمتجر:
+
+```bash
+./scripts/build-apk.sh bundle marketer
+./scripts/apk-test.sh validate dist/marketer-bundle-*.aab 2>/dev/null || true
+./scripts/apk-test.sh validate --app marketer            # على APK الموقّع
+```
+
+---
+
+## 7. أخطاء ADB / الأجهزة / المحاكي
+
+| الرسالة | السبب | الحل |
+|---|---|---|
+| `adb: command not found` | platform-tools غير مثبت | `BUILD_GUIDE.md` §2، أو `export PATH="$ANDROID_HOME/platform-tools:$PATH"` |
+| `adb: no devices/emulators found` | كابل/تصحيح USB | `adb devices`؛ جرّب كابل بيانات لا شاحن؛ `./scripts/apk-test.sh devices` |
+| قائمة الأجهزة فيها `unauthorized` | لم تقبل نافذة التصحيح | اقبل «Allow USB debugging» على الهاتف، أو `adb kill-server && adb devices` |
+| `offline` |adb قديم مقابل هاتف حديث | حدّث platform-tools؛ `adb kill-server` |
+| أكثر من جهاز | `adb -s` مطلوب | `./scripts/apk-test.sh test --serial emulator-5554` |
+| `INSTALL_FAILED_OLDER_SDK` | `minSdk=24` والجهاز Android 6 | استخدم هاتفاً ≥ 7.0 أو خفّض `minSdk` (قرار فريق) |
+| `INSTALL_FAILED_INSUFFICIENT_STORAGE` | لا مساحة | أنظّف الهاتف أو `adb shell pm trim-caches 2G` |
+| التطبيق يثبّت ثم ينهار فوراً | كراش حقيقي | `./scripts/apk-test.sh logcat com.tammtool.marketerapp --follow` — وابحث عن `FATAL EXCEPTION` |
+| المحاكي لا يقلع / `emulator: ERROR: x86 emulation currently requires hardware acceleration` | KVM | `sudo apt-get install -y qemu-kvm`؛ `sudo chown -R $USER /dev/kvm`؛ فعّل VT-x/AMD-V من BIOS |
+| المحاكي بطيء جداً | GPU/RAM | `-no-window -gpu swiftshader_indirect -no-snapshot -read-only`، و`--low-memory` للبناء |
+
+الأداة السريعة: `./scripts/apk-test.sh doctor` تعرض كل ما هو مثبت وما هي حالة الأجهزة في شاشة واحدة.
+
+---
+
+## 8. مشاكل البيئة المحلية
+
+### 8.1 Windows / WSL / Git Bash
+
+| المشكلة | الحل |
+|---|---|
+| `^M: bad interpreter` أو `bad substitution` في `gradlew` | CRLF: `git config core.autocrlf input`، ثم `dos2unix gradlew scripts/*.sh`، واحذف `app/build` وابدأ من جديد |
+| البناء بطيء جداً في WSL | المستودع داخل `/mnt/c` — انقله إلى `~/` (فرق 5–10×) |
+| `Permission denied` على `./gradlew` | `chmod +x` لا يكفي على NTFS: شغّل `sh ./gradlew …` أو `git update-index --chmod=+x` |
+| `android-sdk-setup.sh` لا يدعم Windows | ثبّت SDK من Android Studio و `./scripts/build-apk.sh --sdk "C:/Users/you/AppData/Local/Android/Sdk" …` |
+| مسار SDK فيه مسافات (`Program Files`) | استخدم المسار القصير أو اربط symbolic link؛ السكربت يقتبس لكن AAPT2 القديم يتعثر |
+| `Filename too long` في git | `git config --global core.longpaths true` |
+
+### 8.2 موارد الجهاز
+
+- **قرص ممتلئ:** كاش Gradle يكبر بسهولة إلى 5GB. `du -sh ~/.gradle` ثم
+  `rm -rf ~/.gradle/caches/build-cache-1 ~/.gradle/caches/*/executionHistory`.
+- **ذاكرة قليلة (<6GB):** السكربت يحذّر من تلقاء نفسه — استخدم `--low-memory --no-daemon`،
+  وأغلق المتصفح، وزوّد swap مؤقتاً:
+  ```bash
+  sudo fallocate -l 6G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+  ```
+- **شبكة/بروكسي مؤسسي:** اضبط `JAVA_OPTS="-Dhttps.proxyHost=… -Dhttps.proxyPort=…"` أو
+  أنشئ `~/.gradle/gradle.properties` بـ `systemProp.https.proxyHost=…`، ثم ابنِ بـ `--offline`
+  بعد أول تنزيل ناجح.
+- **مضاد فيروسات يحجز الملفات (Windows):** استثنِ مجلد المستودع و `~/.gradle`.
+
+### 8.3 المساحة الناتجة عن السكربتات (يمكن حذفها بأمان)
+
+```bash
+rm -rf dist/ build-logs/ test-reports/ screenshots/ apps/*/.gradle apps/*/app/build
+```
+
+---
+
+## 9. مشاكل سكربتات المستودع — ما هو معروف ومُصلَح
+
+| السكربت | المشكلة | الحالة |
+|---|---|---|
+| `build-apk.sh` | كان يبحث عن `app-release.apk` فيفشل على build غير موقّع | ✅ مُصلح: يبحث في `…/build/outputs` ويلتقط `app-release-unsigned.apk` |
+| `build-apk.sh` | يفترض وجود `gradlew` ويسقط إن لم يوجد (المستودع لا يرفعه) | ✅ يولّده من `gradle` النظام أو يحمّل توزيعاً محلياً أو يستخدم `gradle` مباشرة |
+| `build-apk.sh` | `read -r` يعلّق في CI/الأنابيب | ✅ لا يسأل أبداً في غير TTY؛ استخدم `--yes` |
+| `build-apk.sh` | مسار المخرجات كان `app/outputs` بدل `app/build/outputs` | ✅ مُصلح (وغطّاه الاختبار الوهمي) |
+| `build-apk.sh` | لا يتحقق من نسخة Java → رسائل خطأ غير مفهومة من Gradle | ✅ يفحص JDK ≥ 17 ويقترح أمر التثبيت لكل توزيعة |
+| `apk-test.sh` | كان يفترض `com.tammtool.marketerapp` حتى لاختبار orders-delivery | ✅ يستخرج الحزمة من APK (aapt2 → aapt → apkanalyzer → تحليل Manifest) أو `--package` |
+| `apk-test.sh` | `timeout … adb logcat \| grep` يكسر `pipefail` ويعطي نجاحاً زائفاً | ✅ فحوص فعلية (pid + بحث FATAL/ANR) ورموز خروج 2/3/4/5 |
+| `apk-test.sh` | فشل غامض إن لم يكن `adb` مثبتاً | ✅ رسالة فيها أمر التثبيت لكل نظام، وكل أوامر الفحص الثابت تعمل بدونه |
+| `android-sdk-setup.sh` | **سطر 83 فيه بقايا `<<<<>>>` → خطأ صيغة** | ❌ مفتوح (الوكيل 2) — تحايل عليه `build-apk.sh` بتثبيت SDK داخلي |
+| `android-sdk-setup.sh` | يثبّت `build-tools;35.0.0` بينما CI يثبّت `34.0.0` | ⚠️ تفاوت — يُفضّل توحيد الرقم (AGP 8.6 يعمل مع 34.0.0 و35.0.0) |
+| `download-gradlew.sh` | يكتب `distributionUrl=gradle-8.5-bin.zip` ثابتاً بغض النظر عن نسخة الطلب | ⚠️ مفتوح — قد يولّد Wrapper بنسخة غير المطلوبة |
+| `sign-apk.sh` | كلمات المرور في `--ks-pass pass:…` (مرئية في `ps`) وسؤال غير تفاعلي يفشل | ⚠️ مفتوح — استخدم `--ks-pass env:KEYSTORE_PASSWORD` |
+| `check-env.sh` | يفحص `./gradlew` في جذر المستودع (حيث لا يوجد أبداً) | ⚠️ مفتوح — يجب فحص `apps/*/gradlew` |
+
+**للاطمئنان إلى السكربتات نفسها** (بلا Android، بلا هاتف، بلا إنترنت):
+
+```bash
+./scripts/tests/mock-smoke.sh        # 89 فحصاً بمحاكاة java/gradle/adb/aapt2
+./scripts/apk-test.sh selftest       # فحص صيغة وسلاسة أوامر
+```
+
+---
+
+## 10. قوائم تحقق
+
+**قبل البناء:**
+
+- [ ] `java -version` يُظهر 17 · [ ] `ANDROID_HOME` صحيح وموجود · [ ] مساحة ≥ 10GB
+- [ ] `./scripts/build-apk.sh --print-env` يعرض التطبيق والمجلد الصحيحين
+
+**بعد البناء وقبل التسليم:**
+
+- [ ] `./scripts/apk-test.sh validate` بلا أخطاء · [ ] الحجم منطقي (debug ≈ 10–30MB، release أصغر)
+- [ ] `minSdk`/`targetSdk` كما هو متفق · [ ] نسخة `release` موقعة (لا `unsigned`)
+
+**قبل تثبيت على هاتف شخص ما:**
+
+- [ ] وقّع debug بنفس المفتاح المألوف أو استخدم `--reinstall` · [ ] `adb devices` بحالة `device`
+- [ ] `./scripts/apk-test.sh test` يعطي «نتيجة الاختبار: ناجح»
+
+---
+
+## 11. طلب المساعدة — أرفق هذا
+
+```bash
+{ echo "== build-apk =="; ./scripts/build-apk.sh --print-env;
+  echo "== env =="; java -version; gradle --version; echo "$ANDROID_HOME"; uname -a;
+  echo "== last build log =="; tail -n 80 build-logs/$(ls -1t build-logs 2>/dev/null | head -1);
+} > tammtool-diagnostic.txt 2>&1
+```
+
+ثم أرسل `tammtool-diagnostic.txt` (لا ترسل لقطات شاشة فقط)، ومعها: الأمر الحرفي الذي
+شغّلته، والفرع/الـ commit، وهل الفشل محلي أم في CI (و`RUN_ID` إن كان CI).

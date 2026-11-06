@@ -221,8 +221,8 @@ export NO_COLOR=1                                 # بدون ألوان (لقص�
 `build-apk.sh` بالترتيب:
 
 1. يكتشف التطبيقات من `apps/` و `examples/` (أي مجلد فيه `settings.gradle*` أو `app/build.gradle*`).
-2. يبحث عن JDK (‏`JAVA_HOME` ← PATH ← مسارات التوزيعات الشائعة) ويتأكد أنه ≥ 17.
-3. يبحث عن Android SDK (‏`--sdk` ← `local.properties` ← `ANDROID_HOME`/`ANDROID_SDK_ROOT` ← مسارات شائعة)
+2. يبحث عن JDK (`JAVA_HOME` ← PATH ← مسارات التوزيعات الشائعة) ويتأكد أنه ≥ 17.
+3. يبحث عن Android SDK (`--sdk` ← `local.properties` ← `ANDROID_HOME`/`ANDROID_SDK_ROOT` ← مسارات شائعة)
    ويكتب `apps/<app>/local.properties` إن لم يكن موجوداً (الملف مستثنى من git).
 4. يختار مشغّل Gradle: إن وُجد `./gradlew` يستخدمه؛ وإلا يولّده بـ `gradle wrapper`؛ وإلا يحمّل توزيعاً محلياً.
 5. يشغّل المهمة المطلوبة داخل `apps/<app>` مع `--console=plain`، ويسجّل كل شيء في
@@ -320,7 +320,7 @@ adb wait-for-device
 الملف `.github/workflows/build-apk.yml` (على فروع العمل) يقوم بـ:
 
 1. `setup-java` JDK 17 (temurin)
-2. تثبيت Android SDK يدوياً بـ curl (‏`platform-tools` + `platforms;android-35` + `build-tools;34.0.0`)
+2. تثبيت Android SDK يدوياً بـ curl (`platform-tools` + `platforms;android-35` + `build-tools;34.0.0`)
 3. `gradle/actions/setup-gradle@v4` بالإصدار **8.7**
 4. `gradle :app:assembleDebug` داخل `apps/marketer` مع `tee ci-build.log`
 5. رفع `ci-build.log` و `app-debug.apk` كـ artifacts
@@ -398,4 +398,4 @@ gradle --stop                                       # إيقاف daemon المع
 * `scripts/README.md` — مرجع أوامر السكربتات كاملاً
 * `AGENTS_STATUS.md` — حالة الفريق وما تم إنجازه
 * `TEAM_COLLABORATION.md` — ملاحظات متقاطعة على ملفات الوكلاء الآخرين
-* `docs/workflow-build-apk.md`, `docs/workflow-sign-apk.md`, `docs/workflow-publish-play-store.md`
+* `docs/workflow-*.md` — شرح سير عمل GitHub Actions (موجودة على فروع الفريق، ستصل مع الدمج)

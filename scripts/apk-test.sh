@@ -396,7 +396,7 @@ find_build_tool() {
   local tool="$1" sdk cand best
   while IFS= read -r sdk; do
     [[ -d "$sdk/build-tools" ]] || continue
-    best="$(ls -1d "$sdk/build-tools"/*/ 2>/dev/null | sort -V | tail -n 1)"
+    best="$(ls -1d "$sdk/build-tools"/*/ 2>/dev/null | sort -V | tail -n 1 || true)"
     [[ -n "$best" && -x "${best}${tool}" ]] || continue
     printf '%s\n' "${best%/}/$tool"
     return 0
@@ -562,7 +562,7 @@ discover_apk() {
   fi
   APP_DIR_FOUND=""
   local base
-  for base in "$PROJECT_ROOT/apps" "$PROJECT_ROOT/examples" "$PROJECT_ROOT/projects"; do
+  for base in "$PROJECT_ROOT/apps" "$PROJECT_ROOT/examples" "$PROJECT_ROOT/projects" "$PROJECT_ROOT/templates"; do
     if [[ -n "$APP_NAME" && -d "$base/$APP_NAME" ]]; then
       APP_DIR_FOUND="$base/$APP_NAME"
       break

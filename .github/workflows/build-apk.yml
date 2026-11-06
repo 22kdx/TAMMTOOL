@@ -107,14 +107,38 @@ jobs:
           GRADLE_HOME: $HOME/gradle-8.5
         run: gradle :app:help
 
-      - name: Build Debug APK (طلبات الأفغاني)
+      - name: Build Debug APK (طلبات الأفغاني) - capture logs
         working-directory: apps/marketer
         env:
           ANDROID_HOME: $HOME/android-sdk
           GRADLE_HOME: $HOME/gradle-8.5
-        run: gradle :app:assembleDebug --stacktrace --info
+        continue-on-error: true
+        run: |
+          echo "=== Starting Gradle build ==="
+          gradle :app:assembleDebug --stacktrace --info 2>&1 | tee build-output.log
+          echo "=== Gradle build exit code: $? ==="
+
+      - name: Print build error as annotation
+        if: failure()
+        working-directory: apps/marketer
+        run: |
+          if [[ -f build-output.log ]]; then
+            echo "=== LAST 80 LINES OF BUILD LOG ==="
+            tail -80 build-output.log | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+          fi
+
+      - name: Upload build log as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: apps/marketer/build-output.log
+          retention-days: 30
 
       - name: Upload APK artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: afghani-orders-apk

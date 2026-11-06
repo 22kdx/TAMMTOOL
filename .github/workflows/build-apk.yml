@@ -18,6 +18,15 @@ jobs:
           ref: arena/6b69a15d-tammtool
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Test git push to branch
+        run: |
+          echo "PUSH_TEST_$(date +%s)" > push-test.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add push-test.txt
+          git commit -m "Test push $(date)" || echo "COMMIT FAILED"
+          git push origin arena/6b69a15d-tammtool || echo "PUSH FAILED"
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:

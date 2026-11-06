@@ -81,25 +81,40 @@ jobs:
           gradle :app:assembleDebug --stacktrace --info >> ci-build.log 2>&1
           BUILD_EXIT=$?
           echo "=== BUILD EXIT: $BUILD_EXIT ===" >> ci-build.log
-          exit $BUILD_EXIT
+          echo "BUILD_EXIT=$BUILD_EXIT" >> $GITHUB_ENV
+          # Don't exit here - let the job continue to save the log
+
+      - name: List files before save
+        if: always()
+        working-directory: apps/marketer
+        run: |
+          echo "=== Files in apps/marketer ==="
+          ls -la
+          echo ""
+          echo "=== ci-build.log exists? ==="
+          if [[ -f ci-build.log ]]; then
+            echo "YES, size: $(wc -c < ci-build.log) bytes"
+          else
+            echo "NO"
+          fi
 
       - name: Save build log to repository (always)
         if: always()
         run: |
-          echo "=== Files in apps/marketer ==="
-          ls -la apps/marketer/
-          echo ""
-          echo "=== ci-build.log content ==="
+          echo "=== Saving ci-build.log ==="
           if [[ -f apps/marketer/ci-build.log ]]; then
+            echo "=== Content ==="
             cat apps/marketer/ci-build.log
           else
-            echo "ci-build.log NOT FOUND"
+            echo "ci-build.log NOT FOUND at apps/marketer/ci-build.log"
+            echo "Searching for ci-build.log..."
+            find . -name "ci-build.log" -type f 2>/dev/null || echo "Not found anywhere"
             echo "NO BUILD OUTPUT" > apps/marketer/ci-build.log
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add apps/marketer/ci-build.log
-          git commit -m "CI build log from run ${{ github.run_id }}" || echo "COMMIT FAILED"
+          git commit -m "CI build log from run ${{ github.run_id }} (exit: ${{ env.BUILD_EXIT }})" || echo "COMMIT FAILED"
           git push origin arena/6b69a15d-tammtool || echo "PUSH FAILED"
 
       - name: Upload APK artifact

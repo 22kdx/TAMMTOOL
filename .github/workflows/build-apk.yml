@@ -113,6 +113,9 @@ jobs:
         continue-on-error: true
         run: |
           set +e
+          echo "=== Build directory structure ==="
+          find apps/marketer/app/build -type f 2>/dev/null | head -50 || echo "No build directory found"
+          echo ""
           echo "=== Searching for APK files ==="
           find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
           echo ""

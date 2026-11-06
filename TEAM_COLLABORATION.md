@@ -3,6 +3,250 @@
 > ملف ملاحظات **إضافي**: كل قسم يبدأ باسم المالك المقصود. كل الوكلاء (والمنسّق) أحرار في
 > الحذف/التعديل بعد التطبيق. كل ملاحظة أدناه **تم التحقق منها** بأمر قابل لإعادة التشغيل.
 > أضيف ملاحظاتك أسفل الملف مع توقيع: `— الوكيل N، التاريخ`.
+>
+> **قواعد التواصل في هذا الفريق:** كل تقرير/طلب/ملاحظة تُكتب هنا أو في `AGENTS_STATUS.md` —
+> لا رسائل خارج المستودع. للوكيل 0 (المنسّق) ابدأ من §0. اذكر دائماً: الفرع، رقم الـ run،
+> سطر الملف، والأمر الذي أثبت الملاحظة — حتى يستطيع غيره إعادة التحقق دون سؤالك.
+
+---
+
+## §0 — تسليم إلى الوكيل 0 (المنسّق): حالة CI اليوم + رقعتان جاهزتان + أداة قراءة السجلات
+
+> من الوكيل 3 (التوثيق) — 2026-11-06، كل رقم أدناه قابل لإعادة التحقق بالأمر المذكور.
+
+### 0.1 خلاصة وضع CI (آخر 6 تشغيلات)
+
+| run | الفرع | الاستنتاج | ما حدث فعلاً |
+|---|---|---|---|
+| `42268043333` | `6b69a15d` | success | إضافة «تشخيص مجلد البناء» — نفس النمط، لا APK |
+| `42267633951` | `6b69a15d` | **success** | artifact وحيد `afghani-orders-apk` بحجم **153 بايت** = ملف `no-apk.txt` نصّي، ليس APK |
+| `42267253047` | `6b69a15d` | failure | فشل في خطوة «Find and upload APK artifact» |
+| `42266809044` | `6b69a15d` | **success** | كل الخطوات ✓ ولا **أي** artifact |
+| `42266484608` | `6b69a15d` | failure | خطوة حفظ السجل |
+| `42266092437` | `6b69a15d` | failure | مراجعة الكوتلن (في `ff5110e8`) |
+
+**دليل التوقيت (run `42268790783`، 60 ثانية إجمالاً)** — من `gh api …/jobs --jq '.jobs[].steps[]|"\(.name)|\(.started_at)|\(.completed_at)"'`:
+
+```
+Install Android SDK (Manual via curl)   8s     ← تثبيت SDK+platform-tools+build-tools في 8 ثوانٍ مشبوه
+Install Gradle                          3s
+Build Debug APK - capture output       41s     ← بناء Android بارد حقيقي: 5–15 دقيقة
+Save build log to repository (always)   0s
+Find and upload APK artifact            0s
+```
+
+41 ثانية تعني أن Gradle تعثّر في **مرحلة الإعداد** ثم ابتلع الـ `set +e` النتيجة — لم يدخل في
+`compileDebugKotlin`/`packageDebug` إطلاقاً. ⇒ لا تكتفِ بـ ✓ ولا بـ «نجاح في دقيقة»: تحقق من
+التوقيت ومن حجم الـ artifact (رقم 0.8).
+
+**النتيجة: لا يوجد APK ناتج عن CI إطلاقاً.** الخطر الآن ليس «فشل البناء» بل **النجاح المضلِّل**:
+`conclusion=success` بينما `BUILD_EXIT` غير مفحوص. لا تعتمِد على أي ✓ قبل تطبيق الرقعة B وتمرير `--gate`.
+
+أمر التحقق (يطبع الجدول + الحكم):
+
+```bash
+./scripts/ci-logs.sh --runs 6
+./scripts/ci-logs.sh 42267633951          # يشرح لماذا هذا النجاح زائف
+```
+
+### 0.2 لماذا «الأخضر» زائف؟ (من ملف الـ workflow نفسه — `git show origin/arena/6b69a15d-tammtool:.github/workflows/build-apk.yml`)
+
+| # | السطر/السلوك | الأثر |
+|---|---|---|
+| 1 | خطوة البناء: `set +e` ثم `gradle :app:assembleDebug … >> ci-build.log` وتخزين `BUILD_EXIT` في `$GITHUB_ENV` دون فحص | لا خطوة تفشل الـ job أبداً ⇒ ✓ دائماً |
+| 2 | `if-no-files-found: warn` + إنشاء `apk-output/no-apk.txt` عند غياب الـ APK | artifact بحجم 153 بايت يُقرأ كأنه نجاح |
+| 3 | `git add apps/marketer/ci-build.log` مع `*.log` في `.gitignore:52` | «COMMIT FAILED» صامت ⇒ لا سجل في git |
+| 4 | لا خطوة `::error::` في هذا الفرع (حُذفت خطوة Annotate) | `annotations` فارغة ⇒ لا شيء يُقرأ عبر API حين يُحجب `--log-failed` |
+| 5 | `sdkmanager … > /dev/null 2>&1 \|\| true` + `cancel-in-progress: true` | فشل SDK مخفي، وتشغيلات تُلغى أثناء القراءة |
+
+### 0.3 رقعة A — الذاكرة (تُنهي `Java heap space`؛ موثّقة في `TROUBLESHOOTING.md` §1.1)
+
+تُلحق بـ `apps/marketer/gradle.properties` و`apps/orders-delivery/gradle.properties`:
+
+```properties
+org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8 -XX:+HeapDumpOnOutOfMemoryError
+kotlin.daemon.jvm.options=-Xmx1536m
+kapt.use.worker.api=true
+kapt.workers.isolation=process
+```
+
+### 0.4 رقعة B — `.github/workflows/build-apk.yml` (نسخة كاملة جاهزة)
+
+تُصلح 1–5 أعلاه، وتوحّد CI مع السكربتات (بناء محلي = بناء CI)، تبني التطبيقين بالتوازي،
+وترفع السجل كأثر بدل الـ commit، وتفشل صراحةً إذا لم يكن الـ APK حقيقياً:
+
+```yaml
+name: Build Android APKs
+
+on:
+  push:
+    branches: ['arena/**', 'main']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false        # لا نُلغي تشغيلات نحن بصددها للقراءة
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [marketer, orders-delivery]
+    env:
+      ANDROID_HOME: ${{ github.workspace }}/android-sdk
+      TAMM_GRADLE_BIN: gradle      # يستخدم Gradle المُثبّت في الـ runner (توفير ~2 دقيقة)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK
+        run: ./scripts/android-sdk-setup.sh --sdk-dir "$ANDROID_HOME" --accept-licenses
+
+      - name: Install Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Self-test the build tooling first
+        run: bash scripts/tests/mock-smoke.sh | tail -5
+
+      - name: Build debug APK (same code path as local)
+        run: ./scripts/build-apk.sh debug ${{ matrix.app }} --no-daemon --yes
+
+      - name: Static-validate the APK (no emulator)
+        run: ./scripts/apk-test.sh validate --app ${{ matrix.app }}
+
+      # لا نجاح مضلَّل: إن لم يكن هناك APK بحجم منطقي يفشل الـ job ولو كانت كل الخطوات ✓
+      - name: Gate — a real APK must exist
+        run: |
+          apk="$(ls -1t dist/*.apk 2>/dev/null | head -1 || true)"
+          [ -n "$apk" ] || { echo "::error::لا يوجد أي APK في dist/ رغم نجاح البناء"; exit 1; }
+          size="$(stat -c %s "$apk")"
+          [ "$size" -gt 1000000 ] || { echo "::error::حجم APK غير منطقي ($size بايت): $apk"; exit 1; }
+          echo "artifact: $apk ($size bytes)"
+
+      # طوق النجأة عند حجب السجل الخام: كل سطر خطأ يصبح annotation مرئياً عبر API
+      - name: Annotate build errors (always, non-fatal)
+        if: always()
+        continue-on-error: true
+        run: |
+          log="$(ls -1t build-logs/*.log 2>/dev/null | head -1 || true)"
+          [ -n "$log" ] || { echo "لا سجل بناء"; exit 0; }
+          echo "=== tail $log ==="
+          tail -n 250 "$log" || true
+          grep -nE '^(e: |FAILURE: |\* What went wrong: |.*error: )' "$log" | head -40 |
+            sed -e 's/%/%25/g' -e 's/^/::error::/' || true
+
+      - name: Upload APK artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-debug-apk
+          path: dist/*.apk
+          if-no-files-found: error          # لا placeholder
+          retention-days: 30
+
+      - name: Upload build log (never commits to the branch)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-build-log
+          path: build-logs/
+          if-no-files-found: warn
+          retention-days: 7
+```
+
+ملاحظات على الرقعة B:
+* حُذف `permissions: contents: write` و`git push` من الـ workflow ⇒ لا تلويث للفروع ولا فشل تشخيصي.
+* `if-no-files-found: error` + خطوة Gate ⇒ لا «أخضر بلا APK» بعد اليوم.
+* `build-logs/` تنتجها `build-apk.sh`؛ والـ `dist/` فيه `*.apk` + `*.sha256` + `latest-*.env`.
+* `TAMM_GRADLE_BIN=gradle` مدعوم من `build-apk.sh` v2.1.0 (يقبل اسم أمر أو مساراً كاملاً).
+* خطوة `Annotate build errors` مكتوبة بـ `if: always()`: رسائل `::error::` فيها تُسجَّل
+  **كتعليقات حتى في التشغيل الناجح**، فتظهر عبر `gh api …/check-runs/<id>/annotations` بدون أي
+  وصول إلى السجل الخام — وهذا وحده يكفي لتقرأ «`Java heap space`» من الطرف الآخر من العالم.
+  (أُثبِت أن هذا يعمل: run `42267633951` الناجح ظهر فيه تعليق `warning` من Node.js.)
+* `if: success()` على رفع الـ APK + `if-no-files-found: error` ⇒ المستودع لن يرى أبداً
+  «نجاح بلا artifact» مرة أخرى، وكل فشل يبقى معه سجل في `*-build-log`.
+
+### 0.5 رقعة C — `scripts/android-sdk-setup.sh` معطَّل بالأخطاء (سطر 83)
+
+```bash
+$ bash -n scripts/android-sdk-setup.sh
+scripts/android-sdk-setup.sh: line 83: syntax error near unexpected token `else'
+```
+السبب: بقايا `<<<<>>>` قبل `echo "أدوات البناء: …"` في كل من `6b69a15d` و`ff5110e8`.
+الحل: احذف السطر (السطران 82–83 يتكرر في `else` و`esac` حسب الفرع) — أو استبدله بـ
+`echo "أدوات البناء: $BUILD_TOOLS_VERSION"`.
+**تأثيره عليَّ محدود:** `build-apk.sh` يكتشف أنه معطَّل (`bash -n`) ويثبّت SDK بنفسه،
+لكن الـ workflow يستدعيه مباشرة ⇒ لا تنسَ رقعة C أو استبدل تلك الخطوة بـ `--setup-sdk`.
+
+### 0.6 ما صُلب فعلاً في فرع الكود `ff5110e8` (لا تُعِد إصلاحه)
+
+فحصتُ طرفَي الفرعين للتو (`git show origin/arena/ff5110e8-tammtool:apps/marketer/app/build.gradle.kts`)،
+والمنشآت الثلاث في `ff5110e8` قد أصلحت: `id("org.jetbrains.kotlin.kapt")`، `VERSION_17` بدل
+`VERSION_1_8`، `kotlinCompilerExtensionVersion = "1.5.8"` مع Kotlin 1.9.22، حذف
+`res/values/ic_launcher_web.png.placeholder`، وإزالة `allprojects { repositories }`.
+**بقي عنده نقص واحد:** `gradle.properties` بلا `org.gradle.jvmargs` (رقعة A أعلاه) و`build-tools;34.0.0`
+في CI مع `compileSdk = 35`.
+
+في المقابل فرع CI `6b69a15d` (آخر كوميت `7eccab8`) ما زال يحمل المشاكل الخمس في `apps/`
+كلها، ويثبّت Gradle **8.5** مع AGP **8.2.0** (متوافقتان) لكنه يبني بلا فحص نتيجة Gradle.
+⇒ **لا تدمج `apps/` من `6b69a15d`**؛ خذ منه `.github/` فقط (أو الرقعة B كاملة).
+
+### 0.7 أمر الدمج المقترح (يعتمد `ff5110e8` أساساً للكود، ويأخذ الـ workflow من `6b69a15d`)
+
+```bash
+# 0) بوابة محلية سريعة قبل أي دمج (لا تحتاج JDK)
+bash scripts/tests/mock-smoke.sh
+
+# 1) ابدأ فرعاً نظيفاً من main
+git switch main && git pull --ff-only
+git switch -c integrate/android-fixes
+
+# 2) كود التطبيقات: مراجعة `ff5110e8` أكمل (أصلحت kapt، Compose 1.5.8/Kotlin 1.9.22،
+#    javac=17، حذفت res/values/ic_launcher_web.png.placeholder، وأزالت allprojects repositories)
+git merge --no-ff origin/arena/ff5110e8-tammtool
+
+# 3) خذ الـ workflow والأدوات من الفرع الآخر (تعارض متوقع هنا — راجع 0.4 قبل الحسم)
+git checkout origin/arena/6b69a15d-tammtool -- .github/workflows/build-apk.yml
+
+# 4) ملفات الوكلاء 2/3 (سكربتات + توثيق) من فرعنا
+git checkout arena/68a3e358-tammtool -- scripts/ BUILD_GUIDE.md TROUBLESHOOTING.md AGENTS_STATUS.md TEAM_COLLABORATION.md README.md .gitignore
+
+# 5) طبّق رقعتي A ثم C، ثم:
+git push -u origin integrate/android-fixes && gh pr create --fill
+gh pr checks --watch
+```
+
+تعارضات متوقعة (لا تفاجأ): `.github/workflows/build-apk.yml` (اسم الـ workflow مختلف)،
+`AGENTS_STATUS.md` و`TEAM_COLLABORATION.md` (كلا الوكلاء يُحرّرانهما)، `.gitignore`
+(فرع `6b69a15d` أزال قواعد `logs/dist/build-*.txt/android-sdk-setup.log` ⇒ أبقِ قواعدنا)،
+ومجلدات `templates/basic-app/` و`examples/hello-world/` و`plugins/` و`programs/` (مكتوبة، لا تعارض).
+
+### 0.8 كيف تعرف أن الـ APK «حقيقي» قبل الإعلان عن نجاح
+
+```bash
+gh run download <run-id> --repo 22kdx/TAMMTOOL --name marketer-debug-apk --dir ./ci-apk
+file ./ci-apk/*.apk                       # يجب: Android package (APK)… / Zip archive
+unzip -l ./ci-apk/*.apk | grep -E 'AndroidManifest.xml|classes.dex|resources.arsc'
+./scripts/apk-test.sh validate ./ci-apk/*.apk          # 11 فحصاً بلا هاتف
+./scripts/apk-test.sh info   ./ci-apk/*.apk            # الحزمة/SDK/الميزات
+sha256sum ./ci-apk/*.apk; cat dist/*.sha256 2>/dev/null # مطابقة البصمة إن وُردت
+```
+معيار سريع: أي «APK» أصغر من ~1MB مشبوه؛ الـ placeholder الحالي 153 بايت.
+و`./scripts/ci-logs.sh <run-id> --gate` يُرجع رمز خروج 1 في نفس الحالة — يصلح كخطوة أخيرة في CI.
 
 ---
 
@@ -89,8 +333,9 @@ kotlin.code.style=official
 
 ---
 
-## §3 → الوكيل 1: 5 أخطاء بناء حتمية في فرع `arena/6b69a15d-tammtool`
+## §3 → وكلاء كود التطبيق: 4 أخطاء بناء حتمية في `apps/` على فرع `arena/6b69a15d-tammtool`
 
+(كانت خمسة؛ رابعها — Compose 1.5.4 مع Kotlin 1.9.20 — تبيّن أنه اقتران صحيح، انظر السطر 3.)
 كلها قابلة للقراءة بأوامر لا تحتاج JDK:
 
 ```bash
@@ -104,14 +349,15 @@ git ls-tree -r --name-only origin/arena/6b69a15d-tammtool | grep -E 'res/values/
 |---|---|---|---|---|
 | 1 | `apps/*/app/build.gradle.kts` | استخدام `kapt(…)` بدون تطبيق بلَجن kapt | `Could not find method kapt() for arguments […]` | أضف `id("org.jetbrains.kotlin.kapt")` إلى `plugins {}` (فعله فرع `ff5110e8`) |
 | 2 | `apps/*/app/build.gradle.kts` | `sourceCompatibility = VERSION_1_8` مع `jvmTarget = "17"` | `Inconsistent JVM-target compatibility detected for tasks 'compileDebugJavaWithJavac' (1.8) and 'compileDebugKotlin' (17)` | اجعل `sourceCompatibility`/`targetCompatibility` = `JavaVersion.VERSION_17` |
-| 3 | `apps/*/app/build.gradle.kts` | Kotlin 1.9.20 + `kotlinCompilerExtensionVersion = "1.5.4"` | فشل فحص توافق Compose Compiler مع Kotlin | إمّا Kotlin 1.9.22 + 1.5.8 (فرع `ff5110e8`) أو Kotlin 1.9.20 + 1.5.6 |
+| 3 | ~~Kotlin 1.9.20 + Compose 1.5.4~~ | **لا خطأ هنا — تصحيح لسطر سابق في هذا الجدول** | — | الاقتران صحيح (Compose 1.5.4 ↔ Kotlin 1.9.20). الذي يصلحه `ff5110e8` هو الانتقال إلى 1.9.22 + 1.5.8 مع AGP 8.6.1، وهو ترقية لا إصلاح خطأ |
 | 4 | `apps/*/build.gradle.kts` + `settings.gradle.kts` | `allprojects { repositories {…} }` مع `FAIL_ON_PROJECT_REPOS` | `Build was configured to prefer settings repositories over project repositories but repository 'Google' was found in build file` | احذف `allprojects { repositories }` (المستودعات معرّفة في settings) |
-| 5 | `apps/*/app/src/main/res/values/ic_launcher_web.png.placeholder` | ملف غير XML داخل `res/values` | فشل `mergeDebugResources`/AAPT2 (امتداد غير متوقع) | احذفه — حذفه فرع `ff5110e8` في كوميت «Remove non-XML placeholder from Android values resources» |
+| 5 | `apps/*/app/src/main/res/values/ic_launcher_web.png.placeholder` | ملف غير XML داخل `res/values` (على **كلا التطبيقين** في `6b69a15d`) | فشل `mergeDebugResources`/AAPT2 (امتداد غير متوقع) | احذفه — حذفه فرع `ff5110e8` |
+| 6 | نسخة Gradle مقابل AGP | `6b69a15d`: Gradle 8.5 + AGP 8.2.0 (✓ متوافق) · `ff5110e8`: Gradle 8.7 + AGP 8.6.1 (✓ متوافق) | لو أُدمج `apps/` من `ff5110e8` مع workflow يثبّت 8.5 ⇒ `Minimum supported Gradle version is 8.7` | ثبّت Gradle 8.7 في الـ workflow (الرقعة B) مهما كان مصدر `apps/` |
 
-**ملاحظة 6 (AGP):** `com.android.tools.build:gradle:8.2.0` مع `compileSdk = 35` يعطي تحذير
+**ملاحظة 7 (AGP):** `com.android.tools.build:gradle:8.2.0` مع `compileSdk = 35` يعطي تحذير
 «AGP 8.2 was tested up to compileSdk = 34». الأنسب `8.6.1` + Gradle 8.7 (ما يستخدمه CI).
 
-**ملاحظة 7 (Room):** تأكد من `room.schemaLocation` و`kapt { correctErrorTypes = true }` لتفادي
+**ملاحظة 8 (Room):** تأكد من `room.schemaLocation` و`kapt { correctErrorTypes = true }` لتفادي
 فشل توليد `RoomDatabase` عند وجود كيانات بعلاقات.
 
 ---

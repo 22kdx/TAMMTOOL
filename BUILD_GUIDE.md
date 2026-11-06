@@ -325,6 +325,14 @@ adb wait-for-device
 4. `gradle :app:assembleDebug` داخل `apps/marketer` مع `tee ci-build.log`
 5. رفع `ci-build.log` و `app-debug.apk` كـ artifacts
 
+### 6.1.1 فخ «الأخضر الزائف» (اقرأ هذا قبل أن تحتفل)
+
+من 2026-11-06 صارت تشغيلات CI **تنجح** دون أن تُنتج APK: خطوة البناء تستخدم `set +e`
+وتحفظ `BUILD_EXIT` ولا تفحصه، وخطوة الرفع تكتب `no-apk.txt` (153 بايت) مكان الـ APK مع
+`if-no-files-found: warn`، وحفظ `ci-build.log` يفشل بصمت لأن `.gitignore` يتجاهل `*.log`.
+الأداة: `./scripts/ci-logs.sh <RUN_ID> --gate` (rc=0 فقط عند وجود APK > 1MB). الرقع الجاهزة
+في `TEAM_COLLABORATION.md` §0.4 والتشخيص في `TROUBLESHOOTING.md` §1.5.
+
 ### 6.2 تنزيل APK من CI
 
 ```bash
@@ -332,10 +340,12 @@ gh run list --repo 22kdx/TAMMTOOL --limit 5
 gh run download <RUN_ID> --repo 22kdx/TAMMTOOL --name marketer-debug-apk --dir ./ci-apk
 ```
 
-### 6.3 قراءة سجل البناء عندما يفشل API
+### 6.3 قراءة سجل البناء عندما يفشل API (أو استخدم `ci-logs.sh`)
 
-`gh run view --log-failed` يفشل في البيئات المقيدة (يذهب إلى
-`results-receiver.actions.githubusercontent.com`). البديل الذي **يعمل عبر API الرسمي**:
+الأسهل: `./scripts/ci-logs.sh <RUN_ID>` — يطبع الخطوات والـ annotations وأحجام الـ artifacts
+والحكم «أخضر زائف؟» (توثيقه في [`scripts/README.md`](scripts/README.md) §7). يدوياً، البديل الذي
+**يعمل عبر API الرسمي** (`gh run view --log-failed` يفشل في البيئات المقيدة لأنه يذهب إلى
+`results-receiver.actions.githubusercontent.com`):
 
 ```bash
 RUN=42264822833

@@ -49,7 +49,7 @@
 #
 set -euo pipefail
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 
 # ============================================================
 # المسارات
@@ -214,7 +214,7 @@ usage() {
   JAVA_HOME / TAMM_JDK                                  مسار JDK
   TAMM_GRADLE_VERSION                                   نسخة Gradle (افتراضي 8.7)
   TAMM_GRADLE_DIST_DIR                                  مكان تخزين توزيع Gradle
-  TAMM_GRADLE_BIN                                       مسار تنفيذ gradle يدوياً
+  TAMM_GRADLE_BIN                                       اسم/مسار تنفيذ gradle يدوياً (يتجاوز التوليد)
   TAMM_EXTRA_GRADLE_ARGS                                وسائط إضافية لـ Gradle
   TAMM_YES=1                                            القبول التلقائي
   NO_COLOR                                              بدون ألوان
@@ -814,6 +814,10 @@ setup_gradle() {
   log_step "التحقق من Gradle"
 
   if [[ -n "$GRADLE_BIN" ]]; then
+    # يُقبل اسم أمر مجرّد (مثل: gradle) أو مسار كامل
+    if [[ "$GRADLE_BIN" != */* ]] && command -v "$GRADLE_BIN" >/dev/null 2>&1; then
+      GRADLE_BIN="$(command -v "$GRADLE_BIN")"
+    fi
     [[ -x "$GRADLE_BIN" ]] || die "TAMM_GRADLE_BIN غير قابل للتنفيذ: $GRADLE_BIN"
     GRADLE_CMD=("$GRADLE_BIN")
     GRADLE_LABEL="gradle (--tamm-gradle-bin)"

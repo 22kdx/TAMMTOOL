@@ -18,6 +18,7 @@ tail -n 60 build-logs/$(ls -1t build-logs | head -1) # آخر سجل بناء (�
 | العرض | اذهب إلى |
 |---|---|
 | CI أحمر ولا أعرف السبب | §1 |
+| CI **أخضر** لكن لا APK (أو artifact بحجم 153 بايت) | §1.5 |
 | `Java heap space` / `OutOfMemoryError` | §2.1 |
 | `SDK location not found` | §4.1 |
 | `Unsupported class file major version` / `requires Java 17` | §3 |
@@ -77,7 +78,7 @@ android.nonTransitiveRClass=true
 > ملاحظة: `android.enableJetifier=true` وحده يضيف دقائق للبناء وذاكرة إضافية، ولا يوجد ما يبرّره
 > في مشروع يعتمد AndroidX بالكامل.
 
-### 1.2 سبب إضافي على فرع agent-1: **إخفاء الفشل الحقيقي** ✅
+### 1.2 سبب إضافي على فرع CI (`6b69a15d`): **إخفاء الفشل الحقيقي** ✅
 
 ```
 run 42264967594 · branch arena/6b69a15d-tammtool · job "build"
@@ -127,6 +128,39 @@ gradle --no-daemon --console=plain :app:assembleDebug     # نفس أمر CI (Gr
 # أو بالسكربت الذي يفعل ما سبق + يجمع السجل في build-logs/:
 cd ../.. && ./scripts/build-apk.sh debug marketer --no-daemon --yes
 ```
+
+### 1.5 الحالة بتاريخ 2026-11-06 (مساءً): **CI أخضر بلا APK** — فشل صامت ✅
+
+بعد إضافة `continue-on-error: true` إلى خطوة السجل، صارت التشغيلات **تنجح** بينما لم يُبنَ شيء:
+
+```
+run 42267633951 · arena/6b69a15d-tammtool · «Build Afghani Orders APK» → success
+  ✓ Build Debug APK - capture output          ← set +e، وBUILD_EXIT لا يفحصه أحد
+  ✓ Save build log to repository (always)     ← «COMMIT FAILED» لأن *.log في .gitignore
+  ✓ Find and upload APK artifact              ← لم يجد APK فكتب apk-output/no-apk.txt
+  artifact: afghani-orders-apk = 153 بايت      ← نص «No APK was built»، ليس APK
+run 42266809044 → success بلا أي artifact · run 42267253047 → فشل في خطوة البحث عن APK
+```
+
+**كيف تميّز الزيف في ثانية؟**
+
+```bash
+./scripts/ci-logs.sh <RUN_ID>          # يشرح الخطوات + الـ annotations + أحجام الـ artifacts
+./scripts/ci-logs.sh <RUN_ID> --gate   # rc=1 إذا لم يكن هناك APK حقيقي (> 1MB) — صالح كبوابة CI
+file <apk> && unzip -l <apk> | grep -c classes.dex
+```
+
+**الأربعة التي يجب أن تُصلَح في الـ workflow** (نسخة كاملة جاهزة في `TEAM_COLLABORATION.md` §0.4):
+
+| الخلل | الإصلاح |
+|---|---|
+| `set +e` + حفظ `BUILD_EXIT` بلا فحص | `exit "$BUILD_EXIT"` في نهاية خطوة البناء، أو خطوة Gate |
+| إنشاء `no-apk.txt` + `if-no-files-found: warn` | احذف الـ placeholder واجعل `if-no-files-found: error` |
+| حفظ السجل بـ `git add` (مرفوض بـ `*.log`) ثم `git push` | ارفع `build-logs/` بـ `upload-artifact` و`if: always()`؛ لا commit من CI |
+| لا `::error::` annotations | `grep -nE 'FAILURE: \|\* What went wrong: \|error: ' log \| sed 's/^/::error::/'` في خطوة `if: failure()` |
+
+> **لا تثق بـ ✓ وحده في هذا المستودع.** قبل الإعلان عن «APK جاهز» نفّذ §0.8 في
+> `TEAM_COLLABORATION.md` (تنزيل الأثر ثم `./scripts/apk-test.sh validate <apk>`).
 
 ---
 
@@ -232,14 +266,24 @@ export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
 | `cannot find symbol class Hilt_MarketerApp` | kapt لا يعمل (انظر السطران أعلاه) |
 | `warning: The following options were not recognized by any processor: '[room.schemaLocation…]'` | إعداد Room schema غير مضبوط — ليس قاتلاً لكن يزيل التتبع |
 
-**موثّقة على فرع agent-1 (`arena/6b69a15d-tammtool`) وتؤدي لفشل بناء حتمي:**
+**أربع مشاكل موثّقة على فرع CI (`arena/6b69a15d-tammtool`) وتؤدي لفشل بناء حتمي**
+(صُلحت كلها في `arena/ff5110e8-tammtool`؛ آخر فحص 2026-11-06 على الكوميت `7eccab8`):
 
 1. `apps/*/app/build.gradle.kts` تستخدم `kapt(…)` بدون تطبيق `org.jetbrains.kotlin.kapt` ❌
 2. `sourceCompatibility = VERSION_1_8` مع `jvmTarget = "17"` ❌
-3. Kotlin 1.9.20 + Compose Compiler 1.5.4 (المواءمة المطلوبة 1.5.6) ❌
-4. `allprojects { repositories }` في `apps/*/build.gradle.kts` مع `FAIL_ON_PROJECT_REPOS` ❌
-5. `apps/*/app/src/main/res/values/ic_launcher_web.png.placeholder` — ملف غير XML داخل `res/values` ❌
-   (AAPT2 يرفضه؛ حُذف في فرع `ff5110e8` ويبقى موجوداً في `6b69a15d`)
+3. `allprojects { repositories }` في `apps/*/build.gradle.kts` مع `FAIL_ON_PROJECT_REPOS` ❌
+4. `apps/*/app/src/main/res/values/ic_launcher_web.png.placeholder` — ملف غير XML داخل `res/values` ❌
+   (AAPT2 يرفضه؛ حُذف في `ff5110e8` وباقٍ في `6b69a15d`، على التطبيقين معاً)
+
+> **تصحيح لملاحظة سابقة:** Kotlin 1.9.20 مع Compose Compiler **1.5.4** اقتران **صحيح**
+> (1.5.4 أصدرت لـ 1.9.20)، فليست عيباً — لا تُصلحها. العيب الوحيد هو خلط نسخ بين الملفين:
+> 1.5.4↔1.9.20 · 1.5.5↔1.9.21 · 1.5.6…1.5.8↔1.9.22 · 1.5.14↔1.9.24 (يتأكد منها الوكيل 1
+> من release notes؛ لا يمكن الوصول إليها من هذه البيئة).
+>
+> **انتبه عند الدمج:** `ff5110e8` ينتقل إلى AGP **8.6.1** الذي يتطلب Gradle **8.7+**، بينما
+> workflow فرع CI يثبّت Gradle **8.5** ⇒ لو أُدمج `apps/` من `ff5110e8` مع workflow `6b69a15d`
+> ستحصل على `Minimum supported Gradle version is 8.7. Current version is 8.5`. الرقعة في
+> `TEAM_COLLABORATION.md` §0.4 تستخدم `gradle/actions/setup-gradle@v4` مع `8.7`.
 
 ### 5.2 موارد غير XML في `res/` (فشل AAPT2 غريب المظهر)
 

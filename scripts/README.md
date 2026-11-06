@@ -1,7 +1,7 @@
 # `scripts/` — مرجع السكربتات (بناء · توقيع · اختبار · تجهيز البيئة)
 
-> كل السكربتات: Bash فقط، بلا اعتماديات خارجية سوى `curl`/`wget` و`unzip`،
-> تعمل من أي مجلد (تحدّد جذر المستودع بنفسها)، وتحترم `NO_COLOR`.
+> كل السكربتات: Bash فقط، بلا اعتماديات خارجية سوى `curl`/`wget` و`unzip` (`ci-logs.sh`
+> يحتاج `gh`)، تعمل من أي مجلد (تحدّد جذر المستودع بنفسها)، وتحترم `NO_COLOR`.
 > الدليل الشامل بالخطوات: [`../BUILD_GUIDE.md`](../BUILD_GUIDE.md) · المشاكل والحلول: [`../TROUBLESHOOTING.md`](../TROUBLESHOOTING.md)
 
 ## أي سكربت أستخدم؟
@@ -16,6 +16,7 @@
 | أختبر APK على هاتفي أو محاكي | `apk-test.sh test` |
 | أفحص APK فقط (بلا هاتف) | `apk-test.sh validate` |
 | أتأكد أن السكربتات نفسها سليمة | `tests/mock-smoke.sh` أو `apk-test.sh selftest` |
+| أفهم لماذا فشل (أو «نجح» بلا APK) في GitHub Actions | `ci-logs.sh` |
 
 ```
 scripts/
@@ -25,12 +26,13 @@ scripts/
 ├── check-env.sh          ← فحص عام للبيئة
 ├── android-sdk-setup.sh  ← تثبيت Android SDK  (⚠ فيه خطأ صيغة حالياً — راجع §6)
 ├── download-gradlew.sh   ← توليد Gradle Wrapper يدوياً
+├── ci-logs.sh            ← قراءة تشغيلات GitHub Actions عبر API فقط (بلا سجلات خام)
 └── tests/mock-smoke.sh   ← اختبار السكربتات نفسها بأدوات مزيفة
 ```
 
 ---
 
-## 1. `build-apk.sh` — البناء المحلي (الإصدار 2.0)
+## 1. `build-apk.sh` — البناء المحلي (الإصدار 2.1)
 
 ```bash
 ./scripts/build-apk.sh [نوع_البناء] [اسم_التطبيق] [خيارات…]
@@ -251,7 +253,41 @@ md/json، غياب الجهاز (رمز 5)، وغياب `adb`. **لا يحتاج
 
 ---
 
-## 7. أنماط مشتركة بين كل السكربتات
+## 7. `ci-logs.sh` — قراءة نتائج CI بلا سجلات خام
+
+مفيدة للمنسّق وحين يفشل `gh run view --log-failed` (وهو يفشل في البيئات المقيدة لأنه
+يذهب إلى `results-receiver.actions.githubusercontent.com`). يعتمد على `gh` فقط (لا `jq`
+ولا `python`) وكل طلباته إلى `api.github.com`.
+
+```bash
+./scripts/ci-logs.sh                       # آخر run على الفرع الحالي: تقرير كامل
+./scripts/ci-logs.sh --runs 10             # جدول آخر 10 تشغيلة (الحالة/الاستنتاج/الفرع/العنوان)
+./scripts/ci-logs.sh 42267633951           # تفاصيل run محدد
+./scripts/ci-logs.sh latest --branch arena/6b69a15d-tammtool
+./scripts/ci-logs.sh latest --json         # ملخص JSON (لأدوات/سكريبتات أخرى)
+./scripts/ci-logs.sh <RUN> --gate; echo $? # 1 = «أخضر زائف» أو فشل — للاستخدام كبوابة
+./scripts/ci-logs.sh --repo 22kdx/TAMMTOOL --limit 80   # مستودع آخر / تعليقات أكثر
+```
+
+| ما يطبعه | المصدر |
+|---|---|
+| بيانات الـ run: workflow/الحالة/الاستنتاج/الفرع/الكوميت/الرابط | `GET /actions/runs/{id}` |
+| كل خطوة بحالتها + قائمة الخطوات الفاشلة | `GET /actions/runs/{id}/jobs` |
+| رسائل الخطأ الحقيقية (`✗ [.github:69] Java heap space`) | `GET /check-runs/{id}/annotations` → تُحفظ في `<run>-annotations.tsv` |
+| أحجام الـ artifacts مع إنذار لكل «APK» أصغر من 1MB | `GET /actions/runs/{id}/artifacts` |
+| حكم التشخيص: `ok` / `fake-green` / `failed` / `running` | مقارنة الاستنتاج مع وجود APK حقيقي |
+
+**لماذا «أخضر زائف» مهم؟** في 2026-11-06 أعطى run `42267633951` نتيجة success ورفـع
+`afghani-orders-apk` بحجم **153 بايت** — وهو ملف `no-apk.txt` تكتبه خطوة البحث عند غياب الـ APK.
+السكربت يكشف هذا تلقائياً؛ لا تعتمد على ✓ في GitHub قبل أن يطبع `--gate` قيمة `0`.
+
+الخيارات: `--branch NAME` · `--repo owner/name` · `--runs [N]` · `--json` · `--gate` · `--limit N`.
+متغيرات البيئة: `CI_REPO` · `CI_LIMIT` · `NO_COLOR`. رموز الخروج: `0` تقرير/`ok` · `1` خطأ usage
+أو `gh` غير مسجّل · `1` مع `--gate` إذا لم يكن البناء حقيقياً.
+
+---
+
+## 8. أنماط مشتركة بين كل السكربتات
 
 * **بلا أسئلة في CI:** كل تفاعل اختياري؛ في غير TTY يُجاب «لا» تلقائياً. استخدم `--yes` للقبول.
 * **قفل البناء:** `build-apk.sh` يمنع بناءين متزامنين على نفس المستودع
@@ -260,7 +296,7 @@ md/json، غياب الجهاز (رمز 5)، وغياب `adb`. **لا يحتاج
 * **إعادة التشغيل بأمان:** كل السكربتات idempotent؛ يمكن تنفيذها بأي ترتيب وعلى أي عدد من الأجهزة.
 * **الألوان:** تُعطَّل تلقائياً إن لم يكن الخرج طرفية، أو بـ `NO_COLOR=1`.
 
-## 8. المسارات التي تُنشأ في جذر المستودع
+## 9. المسارات التي تُنشأ في جذر المستودع
 
 | المسار | من | يُحذف متى |
 |---|---|---|

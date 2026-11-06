@@ -46,3 +46,6 @@ google-services.json
 Thumbs.db
 *.swp
 *.log
+
+# مخرجات جانبية لـ scripts/ci-logs.sh (تقرير CI المحلي)
+*-annotations.tsv

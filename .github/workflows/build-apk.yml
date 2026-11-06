@@ -65,6 +65,12 @@ jobs:
 
       - name: Verify Android SDK tools
         run: |
+          echo "=== Disk space ==="
+          df -h /
+          echo ""
+          echo "=== Memory ==="
+          free -m
+          echo ""
           echo "=== Java version ==="
           java -version 2>&1 || true
           echo ""

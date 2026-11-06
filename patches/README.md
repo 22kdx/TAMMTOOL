@@ -140,3 +140,38 @@ $ 0003: توازن الأقواس في build.gradle.kts للتطبيقين (17/1
 
 — الوكيل 3 · فرع `arena/68a3e358-tammtool` · هذه الرقع مولّدة بـ `git format-patch` من نسخة عمل
 على `74f0a54`، فالتواريخ/التواقيع في الكوميتات الناتجة تعود لـ git لديك.
+
+
+---
+
+## ملحق (2026‑11‑06 ليلاً): 6 أسطر تُنهي «الأخضر الزائف» في workflow فرعك الحالي
+
+للقراءة فقط — **لم أعدّل `.github/` لأنك تملكه**. إن فضّلت شيئاً سريعاً فوق ملفك بدل الدمج الآن،
+فكل ما ينقصه هو فحص `BUILD_EXIT` وإظهاره في ملخّص التشغيل (سطرك يحفظه في `$GITHUB_ENV` ولا يفحصه):
+
+```yaml
+      # ── بعد خطوة «Build Debug APK - capture output» مباشرة ──
+      - name: Fail loudly if Gradle failed (no more green-without-APK)
+        run: |
+          echo "BUILD_EXIT=${BUILD_EXIT:-غير مضبوط} → $GITHUB_STEP_SUMMARY"
+          if [ "${BUILD_EXIT:-1}" -ne 0 ]; then
+            tail -n 200 apps/marketer/ci-build.log 2>/dev/null || echo "لا سجل"
+            echo "::error::فشل Gradle (rc=${BUILD_EXIT:-؟}) — لا APK متوقع، راجع ci-logs.sh"
+            exit 1
+          fi
+
+      - name: Gate — a real APK must exist
+        run: |
+          apk=$(find apps/marketer/app/build/outputs -name "*.apk" -type f 2>/dev/null | head -1)
+          [ -n "$apk" ] || { echo "::error::لا APK في build/outputs رغم rc=0"; exit 1; }
+          size=$(stat -c %s "$apk"); [ "$size" -gt 1000000 ] || { echo "::error::حجم غير منطقي: $size"; exit 1; }
+          echo "apk=$apk size=$size" >> "$GITHUB_STEP_SUMMARY"
+```
+
+* هاتان الخطوتان تُغنيان عن `if: always()` + `continue-on-error: true` التاليتين لهما؛ اترك «Save build log
+  to repository» كما هي لكن **احذف منها `git add`/`git push`** (لا تعمل أصلاً لأن `.gitignore:52 *.log`،
+  ومع `permissions: contents: write` + فِلتر فرعها هي = احتمال حلقة CI لا نهائية). بديل نظيف:
+  `actions/upload-artifact@v4` بمسار `apps/marketer/ci-build.log` و`if-no-files-found: error`.
+* النسخة الكاملة الجاهزة (SDK عبر `android-sdk-setup.sh`، Gradle 8.7، matrix للتطبيقين، اختبارات وحدة،
+  annotations من `* What went wrong:`، artifacts للسجل): `patches/build-apk.yml.proposed` — وقد صارت
+  `.github/workflows/build-apk.yml` في `arena/68a3e358-tammtool`، فدمج الفرع يأتي بها تلقائياً.

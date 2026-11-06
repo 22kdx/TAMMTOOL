@@ -129,16 +129,6 @@ gradle --no-daemon --console=plain :app:assembleDebug     # نفس أمر CI (Gr
 cd ../.. && ./scripts/build-apk.sh debug marketer --no-daemon --yes
 ```
 
-### 1.6 أول فشل **صادق** على `arena/68a3e358` — وما كشفه (2026‑11‑06، ليلاً) ✅
-
-`42273932002` · `completed · failure` بعد 6 دقائق لكل وظيفتين؛ سبب الفشل هذه المرة حقيقي ومفصَّل:
-`Java heap space` في D8 (لا `org.gradle.jvmargs` في `apps/*/gradle.properties`) + إحداثية Compose
-غير موجودة في `orders-delivery`. التفاصيل والإصلاحات في `GAP_TO_APK.md` §8 و§2.4 أعلاه.
-
-**العبرة لأي وكيل:** إذا مرّت `Install Android SDK`/`Install Gradle`/`Self-test` وفشل `Build debug APK`
-فالمشكلة في `apps/` أو في `gradle.properties` الخاص بها — **لا** في السكربتات/CI، ولا تُصلح بزيادة
-مهلة أو بتجاهل الفشل. وإن نجحت كل الخطوات بلا APK ⇒ البوّابة (`Gate`) هي التي تكشف ذلك الآن.
-
 ### 1.5 الحالة بتاريخ 2026-11-06 (مساءً): **CI أخضر بلا APK** — فشل صامت ✅
 
 بعد إضافة `continue-on-error: true` إلى خطوة السجل، صارت التشغيلات **تنجح** بينما لم يُبنَ شيء:
@@ -173,6 +163,16 @@ file <apk> && unzip -l <apk> | grep -c classes.dex
 > `TEAM_COLLABORATION.md` (تنزيل الأثر ثم `./scripts/apk-test.sh validate <apk>`).
 
 ---
+
+### 1.6 أول فشل **صادق** على `arena/68a3e358` — وما كشفه (2026‑11‑06، ليلاً) ✅
+
+`42273932002` · `completed · failure` بعد 6 دقائق لكل وظيفتين؛ سبب الفشل هذه المرة حقيقي ومفصَّل:
+`Java heap space` في D8 (لا `org.gradle.jvmargs` في `apps/*/gradle.properties`) + إحداثية Compose
+غير موجودة في `orders-delivery`. التفاصيل والإصلاحات في `GAP_TO_APK.md` §8 و§2.4 أعلاه.
+
+**العبرة لأي وكيل:** إذا مرّت `Install Android SDK`/`Install Gradle`/`Self-test` وفشل `Build debug APK`
+فالمشكلة في `apps/` أو في `gradle.properties` الخاص بها — **لا** في السكربتات/CI، ولا تُصلح بزيادة
+مهلة أو بتجاهل الفشل. وإن نجحت كل الخطوات بلا APK ⇒ البوّابة (`Gate`) هي التي تكشف ذلك الآن.
 
 ## 2. أخطاء Gradle
 

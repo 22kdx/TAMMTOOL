@@ -226,7 +226,7 @@ DAO واحد + اختبار ViewModel لتسجيل الدخول (يمنع C1 م�
 
 | البند | الحالة | ما تم بالضبط | كيف تتحقق |
 |---|---|---|---|
-| **A1** مخطط Room | ✅ مُطبَّق | `kapt { room.schemaLocation }` + `app/schemas/` في التطبيقين + `androidTest.assets.srcDir` ليقرأ `MigrationTestHelper` المخططات المرفوعة | `grep -n schemaLocation apps/*/app/build.gradle.kts` |
+| **A1** مخطط Room | ⚠️ مُطبَّق بسقطة | `kapt { room.schemaLocation }` + `app/schemas/` في التطبيقين + `androidTest.assets.srcDir` ليقرأ `MigrationTestHelper` المخططات المرفوعة | `grep -n schemaLocation apps/*/app/build.gradle.kts` |
 | **A2** ذاكرة Gradle | ✅ مُطبَّق (أُعيد) | ضبطته `patches/0002` على فرع آخر، **فضاعت في الدمج** (أخذ `apps/*/gradle.properties` نسخة فرع الكود الخالية منها) — فأعدته هذه الجولة بـ `-Xmx4g -XX:MaxMetaspaceSize=1g` + `kotlin.daemon.jvmargs=-Xmx1536m` + `kapt.workers.isolation=process` + `android.enableJetifier=false`. الدرس موثّق في §8 | `grep -n jvmargs apps/*/gradle.properties` |
 | **A3** الـ Wrapper | ⚠️ جزئي | `download-gradlew.sh` صار يحترم وسيط النسخة (كان يكتب 8.5 دائماً)، افتراضيه 8.7، واكتشاف المشاريع آلياً (4 مشاريع مُختبَرة هنا). **`gradle-wrapper.jar` لا يزال غير مرفوع** — التحميل من `services.gradle.org` محجوب في هذه البيئة | `bash scripts/download-gradlew.sh 8.7 --dry-run` + `git ls-files apps/*/*/gradle/wrapper` |
 | **A4** CI الأخضر الزائف | ✅ مُطبَّق | `.github/workflows/build-apk.yml` استُبدل بالنسخة المقترحة: 12 خطوة، matrix للتطبيقين، **بوّابة «APK حقيقي > 1MB»**، رفع السجل كـ artifact (لا `git add`)، `annotations` من `* What went wrong:`، بلا `contents: write` | `python3 -c "import yaml;d=yaml.safe_load(open('.github/workflows/build-apk.yml'));print(len(d['jobs']['build']['steps']))"` → 12 |

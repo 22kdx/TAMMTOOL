@@ -66,16 +66,31 @@ jobs:
           # التحقق من التثبيت
           $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --version
 
-      - name: Download Gradle Wrapper
+      - name: Install Gradle
         run: |
-          chmod +x scripts/download-gradlew.sh
-          ./scripts/download-gradlew.sh 8.5
+          # تحميل توزيع Gradle 8.5
+          echo "جاري تحميل Gradle 8.5..."
+          curl -L --fail --retry 3 --retry-delay 5 \
+            -o $HOME/gradle-8.5-bin.zip \
+            https://services.gradle.org/distributions/gradle-8.5-bin.zip
+
+          # فك الضغط
+          unzip -q -o $HOME/gradle-8.5-bin.zip -d $HOME/
+          rm -f $HOME/gradle-8.5-bin.zip
+
+          # إضافة Gradle إلى PATH
+          echo "GRADLE_HOME=$HOME/gradle-8.5" >> $GITHUB_ENV
+          echo "PATH=$HOME/gradle-8.5/bin:$PATH" >> $GITHUB_ENV
+
+          # التحقق من التثبيت
+          gradle --version
 
       - name: Build Debug APK (طلبات الأفغاني)
         working-directory: apps/marketer
         env:
           ANDROID_HOME: $HOME/android-sdk
-        run: ./gradlew :app:assembleDebug
+          GRADLE_HOME: $HOME/gradle-8.5
+        run: gradle :app:assembleDebug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

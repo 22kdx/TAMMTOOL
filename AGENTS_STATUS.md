@@ -458,3 +458,78 @@ grep -n "room\." apps/marketer/app/build.gradle.kts   # يجب أن يبقى sch
 نجحت على بيئة نظيفة حقيقية، لا عندي فقط. وما زال الفشل الوحيد في `Build debug APK` هو
 `room.generateKotlin can only be enabled in KSP` — لا صنف خطأ جديد من إضافاتي (تأكدت من الـ annotations
 كاملة: 26 تعليقاً، كلها من السبب نفسه)، وبقي الحذف عندك.
+
+
+---
+
+# أ8. «هل هذه عند الوكيل 0؟» — لا. هذا بالضبط ما ينقصه وكيف يأخذه
+
+> سؤال المستخدم اليوم: هل أدوات `tools/` وتطبيق الفلتر موجودة عند المنسّق؟ قِسْتُ ذلك على
+> `origin/arena/6b69a15d-tammtool` عند **`fff3300` (18:30 — لم يتحرك فرعك منذها)**، والأرقام من `git ls-tree`:
+
+| العنصر | عندك | عندي (`357ef14`) | الفرق |
+|---|---|---|---|
+| `tools/` (القفل + 4 سكربتات + القالب + الـ wrapper المخزّن + اختباراته) | **0 ملف** | **49 ملفاً** (128٬583 بايت) | كلّه جديد عندك |
+| `apps/filter/` (المولَّد من القالب + wrapper) | **0 ملف** | **42 ملفاً** | كلّه جديد |
+| `patches/` | 0 | 5 | 0001–0003 + `build-apk.yml.proposed` + README |
+| `scripts/ci-logs.sh` (قراءة CI بلا سجل خام) | **مفقود** | موجود (337 سطراً) | مفقود عندك |
+| `scripts/tests/mock-smoke.sh` (90 فحصاً) | **مفقود** | موجود | **سقف: خطوة `Self-test` في workflow هذا الفرع تنادي ملفاً غير موجود عندك** |
+| `scripts/build-apk.sh` | 178 سطراً، **بلا رقم إصدار** | **1388 سطراً · v2.1.0** | عندك النسخة الأولى (بلا اكتشاف المشاريع، بلا `TAMM_GRADLE_BIN`، بلا `dist/`) |
+| `scripts/apk-test.sh` | النسخة القديمة | **v2.0.0 (~1530 سطراً)** | `validate --app` بلا محاكي + رموز خروج 2/3/4/5 عندك غير موجودة |
+| وثائق الجذر | 3 (`README`, `AGENTS_STATUS`, `TEAM_COLLABORATION`) | 8 | ناقصك: `BUILD_GUIDE` · `TROUBLESHOOTING` · `GAP_TO_APK` · `PLAY_STORE_RELEASE` · `FILTER_APP_TOOLCHAIN` · `scripts/README` |
+| `apps/marketer/gradle.properties` | 3 أسطر، **بلا `org.gradle.jvmargs`** | `-Xmx4g -XX:MaxMetaspaceSize=1g` + kapt معزول | عندك سيُعيد `D8: Java heap space` (ثُبِّت في `42273932002`) |
+| `.github/workflows/build-apk.yml` | نسختك (فلتر فرع واحد + `git add ci-build.log`) | 12 خطوة + matrix + بوابة + artifacts | فارق 199 سطراً — **قرارك** |
+
+الإجمالي: **~12٬800 سطر مضاف و109 ملفاً** ما بين فرعنا.
+
+## أ8‑1 الطريق الموصى به: دمج واحد (ولا تُطبّق `patches/` بعدها)
+
+```bash
+git fetch origin
+git merge --no-ff origin/arena/68a3e358-tammtool
+# المتوقع: تعارض في .github/workflows/build-apk.yml (+ ربما README/AGENTS_STATUS)
+#   خُذ نسختي للـ workflow:  git checkout --theirs .github/workflows/build-apk.yml
+git commit        # أو: git merge --abort ثم الطريق أ8‑2
+```
+
+**قبل أن تدفع، ثلاثة قرارات كلها لك (لا أناب عنك فيها):**
+1. `strategy.matrix.app: [marketer, orders-delivery, filter]` — سطر واحد يفعّل تطبيق الفلتر في CI.
+2. `arg("room.generateKotlin", "true")` في `apps/{marketer,orders-delivery}/app/build.gradle.kts:107`
+   — **احذفه**؛ هو آخر سبب فشل حقيقي معروف (`42274698251` و`42281343268` كلاهما عنده).
+3. إن بقيت على مصفوفة فرعك القديمة (AGP 8.2.0 + Kotlin 1.9.20 + `composeOptions 1.5.4`) فلا تُدخل
+   منها شيئاً: المصفوفة الصحيحة عندي (AGP 8.6.1 + 1.9.22 + 1.5.8 + Gradle 8.7)، **والخلط بين
+   النسختين هو ما يُنتج رسالة Compose Compiler الملتبسة**.
+
+## أ8‑2 أو خذ الأدوات فقط (بلا لمس `apps/` ولا `.github/`)
+
+```bash
+git checkout origin/arena/68a3e358-tammtool -- tools apps/filter patches   scripts/build-apk.sh scripts/apk-test.sh scripts/ci-logs.sh scripts/tests/mock-smoke.sh scripts/README.md   BUILD_GUIDE.md TROUBLESHOOTING.md GAP_TO_APK.md PLAY_STORE_RELEASE.md FILTER_APP_TOOLCHAIN.md
+bash tools/tests/toolchain-smoke.sh | tail -2      # متوقع: 43 نجاح · 0 فشل
+bash scripts/tests/mock-smoke.sh  | tail -2        # متوقع: كل الفحوص نجحت (90)
+bash tools/install-gradle-wrapper.sh --verify      # متوقع: ✓ كل ملفات الـ vendor مطابقة
+bash tools/verify-filter-app.sh --dir apps/filter --gate && echo "apps/filter ✓"
+```
+
+هذا يعطيك الأدوات + التطبيق + التوثيق، ولا يغيّر تطبيقاً قائماً ولا CI — ثم تقرّر أنت متى تأخذ
+`apps/*/gradle.properties` (ذاكرة Gradle) والإصلاحين الآخرين أعلاه.
+
+## أ8‑3 لماذا ستريد `apps/filter` الآن بالذات
+
+* **أصغر هدف يمكن أن يُبنى**: بلا Room ⇒ بلا kapt ⇒ فئة خطأ `42274698251` مستحيلة فيه، وبلا Hilt،
+  وبلا طبقة شبكة (فلا C2)، وبلا إشعارات (فلا C4). إن أردت «CI أخضر بدليل APK > 1MB» ففلتر صغير
+  أسرع طريق من إصلاح تطبيقين كاملين — وإن ظهر أخضر معه، فالباقي مسألة مطابقة مصفوفة لا هندسة.
+* **الفحوص البنيوية تعمل بلا SDK**: `tools/verify-filter-app.sh` يعطيك رأياً في ثانية داخل أي خطوة CI
+  قبل 12 دقيقة من Gradle.
+* **الأدوات مُجرَّبة على الـ runner**: خطوة `Self-test` في `42281343268` كانت `success` — أي أن
+  الأربعين فحصاً (43 أدوات + 89 سكربتات) نجحت على `ubuntu-24.04` حقيقية، لا في sandbox التوثيق فقط.
+
+## أ8‑4 تحذيران من الوقوع في نصف الدمج
+
+1. **لا تُبْقِ `scripts/tests/mock-smoke.sh` خارج المستودع مع workflow هذا الفرع**: خطوة
+   `Self-test the build tooling first` تنادي `bash scripts/tests/mock-smoke.sh`، وغيابها يُفشل
+   الوظيفة قبل البناء لسبب لا علاقة له بالكود. (أو احذف تلك الخطوة إن أردت CI بلا أدواتي.)
+2. **لا تُعد توليد الـ wrapper بـ `download-gradlew.sh` بعد أخذ `tools/vendor/`**: الأمران يصنعان
+   نفس الملفات من مصدرين مختلفين. الأفضل: `./tools/install-gradle-wrapper.sh --apps` (بصمات
+   مُتحقق منها)، واقتل `download-gradlew.sh` أو اجعله ينادي هذا السكربت — قرارك أنت والوكيل 2.
+
+— الوكيل 3 · لم أشغّل CI ولم ألمس ملفاتك · 2026‑11‑06

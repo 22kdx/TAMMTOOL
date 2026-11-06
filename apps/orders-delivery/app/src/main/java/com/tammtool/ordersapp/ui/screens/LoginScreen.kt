@@ -85,7 +85,7 @@ fun LoginScreen(
             onValueChange = { password = it },
             label = { Text("كلمة المرور") },
             visualTransformation = if (showPassword) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.VisiblePassword),
+            keyboardOptions = KeyboardOptions(keyboardType = if (showPassword) KeyboardType.Text else KeyboardType.Password),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             trailingIcon = {

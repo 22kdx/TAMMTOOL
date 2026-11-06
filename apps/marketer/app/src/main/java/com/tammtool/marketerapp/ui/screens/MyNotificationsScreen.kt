@@ -86,7 +86,7 @@ private fun NotificationCard(notification: MarketerNotification) {
             Spacer(modifier = Modifier.weight(1f))
             if (!notification.isRead) {
                 Icon(
-                    imageVector = Icons.Default.BlurCircle,
+                    imageVector = Icons.Default.BlurOn,
                     contentDescription = "غير مقروء",
                     tint = MaterialTheme.colorScheme.primary
                 )

@@ -1,111 +1,63 @@
-name: Build Afghani Orders APK
+name: Build Android APK
 
 on:
   push:
-    branches: [ arena/6b69a15d-tammtool ]
+    branches: ['arena/**', main]
+  pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
+    timeout-minutes: 30
     steps:
-      - name: Clone repository
+      - name: Checkout requested revision
         uses: actions/checkout@v4
-        with:
-          ref: arena/6b69a15d-tammtool
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: '17'
           distribution: temurin
 
-      - name: Install Android SDK (Manual via curl)
-        run: |
-          mkdir -p $HOME/android-sdk/cmdline-tools
-          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-          curl -L --fail --retry 3 --retry-delay 5 \
-            -o $HOME/android-sdk/cmdline-tools.zip \
-            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+      - name: Install SDK packages
+        run: sdkmanager 'platforms;android-35' 'build-tools;34.0.0'
 
-          unzip -q -o $HOME/android-sdk/cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools/
-          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
-          rm -f $HOME/android-sdk/cmdline-tools.zip
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
 
-          mkdir -p $HOME/android-sdk/licenses
-          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $HOME/android-sdk/licenses/android-sdk-license
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/android-sdk/licenses/android-sdk-license
-          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $HOME/android-sdk/licenses/android-sdk-preview-license
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/android-sdk/licenses/android-sdk-preview-license
-
-          yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --install \
-            "platform-tools" "platforms;android-35" "build-tools;35.0.0" > /dev/null 2>&1 || true
-
-          $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --version
-
-      - name: Install Gradle
-        run: |
-          curl -L --fail --retry 3 --retry-delay 5 \
-            -o $HOME/gradle-8.5-bin.zip \
-            https://services.gradle.org/distributions/gradle-8.5-bin.zip
-
-          unzip -q -o $HOME/gradle-8.5-bin.zip -d $HOME/
-          rm -f $HOME/gradle-8.5-bin.zip
-
-          echo "GRADLE_HOME=$HOME/gradle-8.5" >> $GITHUB_ENV
-          echo "PATH=$HOME/gradle-8.5/bin:$PATH" >> $GITHUB_ENV
-
-          gradle --version
-
-      - name: Create local.properties
+      - name: Build Debug APK
         working-directory: apps/marketer
+        shell: bash
         run: |
-          echo "sdk.dir=$HOME/android-sdk" > local.properties
+          set -o pipefail
+          gradle :app:assembleDebug --stacktrace --console=plain 2>&1 | tee ci-build.log
 
-      - name: Build Debug APK - save log
-        working-directory: apps/marketer
-        env:
-          ANDROID_HOME: $HOME/android-sdk
-        run: |
-          echo "=== BUILD START ===" > ci-build.log
-          echo "JAVA_HOME=$JAVA_HOME" >> ci-build.log
-          echo "ANDROID_HOME=$ANDROID_HOME" >> ci-build.log
-          echo "=== RUNNING GRADLE ===" >> ci-build.log
-          set +e
-          gradle :app:assembleDebug --stacktrace --info >> ci-build.log 2>&1
-          BUILD_EXIT=$?
-          echo "=== BUILD EXIT: $BUILD_EXIT ===" >> ci-build.log
-          exit $BUILD_EXIT
-
-      - name: Save build log to repository (always)
+      - name: Upload build log
         if: always()
-        run: |
-          echo "=== Files in apps/marketer ==="
-          ls -la apps/marketer/
-          echo ""
-          echo "=== ci-build.log content ==="
-          if [[ -f apps/marketer/ci-build.log ]]; then
-            cat apps/marketer/ci-build.log
-          else
-            echo "ci-build.log NOT FOUND"
-            echo "NO BUILD OUTPUT" > apps/marketer/ci-build.log
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add apps/marketer/ci-build.log
-          git commit -m "CI build log from run ${{ github.run_id }}" || echo "COMMIT FAILED"
-          git push origin arena/6b69a15d-tammtool || echo "PUSH FAILED"
-
-      - name: Upload APK artifact
-        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: afghani-orders-apk
+          name: marketer-ci-build-log
+          path: apps/marketer/ci-build.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketer-debug-apk
           path: apps/marketer/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
           retention-days: 30

@@ -2,7 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.20"
-    id("com.google.dagger.hilt.android") version "2.50" apply false
+    id("com.google.dagger.hilt.android") version "2.50"
     id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
@@ -18,6 +18,15 @@ android {
         versionName = "1.0.0"
         vectorDrawables {
             useSupportLibrary = true
+        }
+    }
+
+    signingConfigs {
+        create("debug") {
+            storeFile(file("debug.keystore"))
+            storePassword("android")
+            keyAlias("androiddebugkey")
+            keyPassword("android")
         }
     }
 

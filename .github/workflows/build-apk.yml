@@ -46,8 +46,19 @@ jobs:
 
       # set -o pipefail إلزامي: بدونه يخرج mock-smoke بـ rc=1 ويبقى الأنبوب أخضر —
       # وهذا ما جعل 12 فحصاً أحمر غير مرئية في 42281343268/42284377251 (kذنب أدواتي لا من غيره).
+      # الفحص يفشل بصوت مسموع: آخر 8 أسطر وحدها لا تكفي، لأن كل اختبار يكتب وصفه في السطر نفسه
+      # فنجعل أسماء الفحوص الحمراء annotations مرئية عبر API (وهي وحدها ما يُقرأ من هنا).
       - name: Self-test the build tooling first
-        run: set -o pipefail; bash scripts/tests/mock-smoke.sh | tail -8
+        run: |
+          set -o pipefail
+          out="$(bash scripts/tests/mock-smoke.sh 2>&1)" && rc=0 || rc=$?
+          if [ "$rc" -ne 0 ]; then
+            echo "$out" | tail -40
+            echo "$out" | grep -E '✗|فشل' | grep -v '0 فشل' | head -25 \
+              | sed -e 's/%/%25/g' -e 's/^/::error::Self-test: /' || true
+            exit "$rc"
+          fi
+          echo "$out" | tail -4
 
       - name: Build debug APK (same code path as local)
         run: ./scripts/build-apk.sh debug ${{ matrix.app }} --no-daemon --yes

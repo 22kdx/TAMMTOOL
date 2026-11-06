@@ -15,6 +15,17 @@ no()   { printf '  \033[0;31m✗\033[0m %s\n' "$*"; FAIL=$((FAIL + 1)); }
 t()    { local desc="$1"; shift; if "$@" >/dev/null 2>&1; then ok "$desc"; else no "$desc"; fi; }
 tfail(){ local desc="$1"; shift; if "$@" >/dev/null 2>&1; then no "$desc (كان متوقعاً الفشل)"; else ok "$desc"; fi; }
 
+# حارس الأذونات: على الـ runner تُكتب الملفات من فهرس git، لا من قرص المبرمج. لو سُجّل أي
+# سكربت بوضع 100644 فـ «bash x.sh» ينجح محلياً و«./x.sh» يفشل هناك — وهذا بالضبط ما أصمّ
+# خطوة Self-test في 42288877168 (كان tools/vendor/…/gradlew بوضع 644) بينما كل فحوصي خضراء هنا.
+mode_guard() {
+  local bad
+  bad=$(git -C "$ROOT" ls-files -s tools scripts 2>/dev/null | awk '$1=="100644" && /\.sh$|gradlew$/ {print $4}')
+  [[ -z "$bad" ]] && return 0
+  printf '%s\n' "$bad" >&2
+  return 1
+}
+
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/tamm-tools-XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -59,6 +70,7 @@ t "--os/--arch يُقبلان"    bash "$S" --install ktlint --os macos --arch a
 t "وسيط مجهول يفشل"        bash -c "! bash '$S' --nope 2>/dev/null"
 
 echo "== install-gradle-wrapper.sh =="
+t "كل سكربت متتبَّع مسجَّل 100755 في git (runner لا يعرف chmod)" mode_guard
 W="$TOOLS_DIR/install-gradle-wrapper.sh"
 t "--verify على المخزون"   bash "$W" --verify
 t "--dry-run --all"        bash "$W" --dry-run --all

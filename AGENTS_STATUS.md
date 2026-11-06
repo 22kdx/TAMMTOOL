@@ -453,9 +453,12 @@ grep -n "room\." apps/marketer/app/build.gradle.kts   # يجب أن يبقى sch
 **ولم أنفّذ ما يبقى في ر6** (حذف `arg("room.generateKotlin","true")` من التطبيقين) لأنه يمسّ `apps/`؛
 هو سطر واحد إن أردته مني في كوميت مستقل.
 
-**دليل من الـ runner (وليس من sandbox)**: تشغيل `42281343268` على `ubuntu-24.04` بعد دفع الأدوات —
-خطوة `Self-test` = **success**، أي أن فحوص `tools/` الثلاثة والأربعين (ومعها 89 فحص سكربتات)
-نجحت على بيئة نظيفة حقيقية، لا عندي فقط. وما زال الفشل الوحيد في `Build debug APK` هو
+**تصحيح واجب (2026-11-06، 20:40)**: كنتُ قلتُ إن خطوة `Self-test` في `42281343268` إثباتُ نجاحٍ على
+runner. هي إثباتُ **تشغيل** فقط: الخطوة كانت `bash scripts/tests/mock-smoke.sh | tail -5` بلا
+`pipefail`، فرمز الخروج هو رمز `tail`. وحين أُعيد تشغيل الفحوص بعد `git reset` انكشف أن
+`gradle-wrapper.jar` لم يكن في git أصلاً (`*.jar` في `.gitignore`) ⇒ 12 فحصاً حمراء كانت ستبقى مخفية.
+`f0df555` يصلح الأمرين: الـ jar متتبَّع الآن (بصمته مطابقة لـ `manifest.json`) والخطوة صارت
+`set -o pipefail; … | tail -8`. الفحوص محلياً بعد الإصلاح: 43/43 و90/90. وما زال الفشل الوحيد في `Build debug APK` هو
 `room.generateKotlin can only be enabled in KSP` — لا صنف خطأ جديد من إضافاتي (تأكدت من الـ annotations
 كاملة: 26 تعليقاً، كلها من السبب نفسه)، وبقي الحذف عندك.
 
@@ -533,3 +536,37 @@ bash tools/verify-filter-app.sh --dir apps/filter --gate && echo "apps/filter �
    مُتحقق منها)، واقتل `download-gradlew.sh` أو اجعله ينادي هذا السكربت — قرارك أنت والوكيل 2.
 
 — الوكيل 3 · لم أشغّل CI ولم ألمس ملفاتك · 2026‑11‑06
+
+---
+
+# أ9. طلب المستخدم الآن: «اصنع تطبيق المسوّق وأعطني APK» — الحالة الحقيقية
+
+تنفيذياً، الحاجز لم يكن نقص ميزة في `apps/marketer` بل ثلاثة أعطال في الشيفرة/الأدوات، كلها صارت
+معالجة في هذا الفرع — وهذا تسلسل الأدلة من CI نفسه (كل رقم تشغيل مذكور يمكن مراجعته بـ
+`bash scripts/ci-logs.sh <id>`):
+
+| التشغيل | ما قاله | ما فُعل |
+|---|---|---|
+| `42273932002` | `D8: Java heap space` + إحداثية Compose غير موجودة | `jvmargs -Xmx4g` في الثلاثة + تصحيح الإحداثيات |
+| `42274698251` | `room.generateKotlin can only be enabled in KSP` ⇒ `:app:kaptDebugKotlin FAILED` | حُذف الخيار من التطبيقين (`01e6280`) |
+| `42281343268` | نفس الخطأ (كان عندي، لم يُنفَّذ الإصلاح بعد) | — |
+| `42284377251` | **`Build debug APK` = success و`Static-validate` = success**؛ الفشل الوحيد `:app:compileDebugUnitTestKotlin` في `PasswordHasherTest.kt:64` («Function invocation 'salt()' expected») | `56dc02e`: السطر مُصلَح (كان قالب Kotlin عندي، لا خطأ في `PasswordHasher`) + «Upload APK artifact» صار `if: always()` حتى لا يُدفن APK مبنيّ بسبب اختبار أحمر |
+| `f0df555` | الـ wrapper jar متتبَّع + `pipefail` في Self-test + فاحص بنمطين | جارٍ |
+
+**ترجمة عملية**: بعد `01e6280` صار `apps/marketer` يُترجَم ويُغلَّف ويُنقَّى بـ AAPT2 على runner فعلي،
+أي أن الـ APK **ينتَج**؛ ولم يعد ينقصه إلا أن ينجح اختبار الوحدة ليُرفَع كـ artifact (وهو مُصلَح في
+`56dc02e`) — وأصبحت بوابة «APK حقيقي في `dist/`» + الرفع دائماً، فالفشل الأحمر لن يخبئ الملف بعد اليوم.
+
+**ما لا أستطيع فعله هنا، ولا أجمّله**: بيئتي بلا JDK وبلا Android SDK و`dl.google.com`/`repo1.maven.org`
+محجوبان (`curl` يرجع 000) — لذلك لا أستخرج APK بنفسي من هذا Sandbox ولا أعيد توقيعه؛ الطريق الوحيد
+الصادق هو runner. الملف النهائي سيُنزَّل من artifact التشغيل:
+
+    gh run download <run-id> --repo 22kdx/TAMMTOOL --name marketer-debug-apk --dir ./apk
+    # أو من واجهة GitHub: Assets داخل «Artifacts» في صفحة التشغيل
+
+وهو **debug APK موقَّع بمفتاح التصحيح** (لا يُرفع به إلى Play؛ للتوزيع الداخلي/التجربة على الهاتف
+كافٍ: `adb install -r marketer-debug.apk`). لـ release موقَّع: `scripts/sign-apk.sh` + `PLAY_STORE_RELEASE.md`.
+
+**قرار طلبته منك ولا أتنفذه في فرعك**: مصفوفة `apps/*/app/build.gradle.kts` عندك ما زالت على
+AGP 8.2.0/Kotlin 1.9.20/composeOptions 1.5.4، وهي تصمد داخل نفسها؛ إن دمجتها مع مصفوفتي (8.6.1/1.9.22/1.5.8)
+فلا تخلط الاثنين — هذه أكثر بوابة انكسار شيوعاً عند الدمج.

@@ -30,9 +30,12 @@ TAMMTOOL/
 ├── examples/                 # تطبيقات تجريبية للتجربة والتعلم
 │   └── hello-world/
 ├── apps/                     # تطبيقات كاملة مبنية على هذا الإطار
-│   └── orders-delivery/      # تطبيق إدارة الطلبات والمناديب (كامل)
-│       ├── README.md         # توثيق التطبيق وخريطة العملية
-│       └── app/              # كود تطبيق Android كامل (Kotlin + Compose + Hilt + Room)
+│   ├── orders-delivery/      # تطبيق إدارة الطلبات والمناديب (كامل - جميع الأدوار)
+│   │   ├── README.md         # توثيق التطبيق وخريطة العملية
+│   │   └── app/              # كود تطبيق Android كامل (Kotlin + Compose + Hilt + Room)
+│   └── marketer/             # تطبيق المسوق (منفصل - دور المسوق فقط)
+│       ├── README.md         # توثيق تطبيق المسوق
+│       └── app/              # كود تطبيق Android للمسوق فقط (Kotlin + Compose + Hilt + Room)
 └── .gitignore
 ```
 

@@ -90,7 +90,9 @@ jobs:
         continue-on-error: true
         working-directory: apps/marketer
         run: |
-          echo "=== Files in apps/marketer ==="
+          echo "=== Current directory ==="
+          pwd
+          echo "=== Files in current directory ==="
           ls -la
           echo ""
           echo "=== ci-build.log check ==="
@@ -99,7 +101,11 @@ jobs:
             echo "=== Content ==="
             cat ci-build.log
           else
-            echo "ci-build.log NOT FOUND"
+            echo "ci-build.log NOT FOUND in apps/marketer"
+            echo "Checking parent directory..."
+            ls -la ../ci-build.log 2>/dev/null || echo "Not in parent either"
+            echo "Searching for ci-build.log..."
+            find . -name "ci-build.log" -type f 2>/dev/null || echo "Not found anywhere"
             echo "NO BUILD OUTPUT" > ci-build.log
           fi
           cd ..

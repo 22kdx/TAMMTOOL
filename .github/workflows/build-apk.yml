@@ -140,25 +140,19 @@ jobs:
         run: |
           echo "=== Current directory ==="
           pwd
-          echo "=== GITHUB_WORKSPACE ==="
-          echo "$GITHUB_WORKSPACE"
-          echo "=== Files in workspace ==="
-          ls -la "$GITHUB_WORKSPACE/" 2>&1 || true
+          echo "=== Files in current directory ==="
+          ls -la
           echo "=== ci-build.log check ==="
-          if [[ -f "$GITHUB_WORKSPACE/ci-build.log" ]]; then
-            echo "ci-build.log EXISTS, size: $(wc -c < "$GITHUB_WORKSPACE/ci-build.log") bytes"
-            echo "=== Last 30 lines ==="
-            tail -30 "$GITHUB_WORKSPACE/ci-build.log"
+          if [[ -f ci-build.log ]]; then
+            echo "ci-build.log found, size: $(wc -c < ci-build.log) bytes"
           else
-            echo "ci-build.log NOT FOUND - creating placeholder"
-            echo "NO BUILD OUTPUT - ci-build.log was not created by gradle" > "$GITHUB_WORKSPACE/ci-build.log"
+            echo "ci-build.log NOT FOUND - creating placeholder in current dir"
+            echo "NO BUILD OUTPUT - ci-build.log was not created by gradle" > ci-build.log
           fi
-          echo "=== Attempting git commit and push ==="
-          cd "$GITHUB_WORKSPACE"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add ci-build.log
-          git commit -m "CI build log from run ${{ github.run_id }} (exit: ${{ env.BUILD_EXIT }})" || echo "COMMIT FAILED"
+          git commit -m "CI build log from run ${{ github.run_id }}" || echo "COMMIT FAILED"
           git push origin arena/6b69a15d-tammtool || echo "PUSH FAILED"
 
       - name: Upload APK artifact

@@ -93,7 +93,7 @@ kapt.workers.isolation=process
 
 ### 0.4 رقعة B — `.github/workflows/build-apk.yml` (نسخة كاملة جاهزة)
 
-> **ملف جاهز:** [`patches/build-apk.yml.proposed`](../patches/build-apk.yml.proposed) — انسخه فوق
+> **ملف جاهز:** [`patches/build-apk.yml.proposed`](patches/build-apk.yml.proposed) — انسخه فوق
 > `.github/workflows/build-apk.yml`؛ النص أدناه هو نفسه للتوثيق (ومُختبَر: YAML صالح و6/6 خطوات
 > `run` تمرّ بـ `bash -n`).
 

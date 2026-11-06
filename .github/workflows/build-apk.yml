@@ -90,6 +90,23 @@ jobs:
         run: |
           echo "sdk.dir=$HOME/android-sdk" > local.properties
 
+      - name: Verify local.properties
+        working-directory: apps/marketer
+        run: |
+          echo "=== local.properties contents ==="
+          cat local.properties
+          echo "=== Java version ==="
+          java -version 2>&1
+          echo "=== Gradle version ==="
+          gradle --version
+
+      - name: Configure Gradle project (diagnostic)
+        working-directory: apps/marketer
+        env:
+          ANDROID_HOME: $HOME/android-sdk
+          GRADLE_HOME: $HOME/gradle-8.5
+        run: gradle :app:help
+
       - name: Build Debug APK (طلبات الأفغاني)
         working-directory: apps/marketer
         env:

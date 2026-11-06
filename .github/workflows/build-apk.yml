@@ -94,6 +94,11 @@ jobs:
           echo "=== Flutter doctor ==="
           flutter doctor -v
 
+      - name: Accept Android licenses
+        run: |
+          echo "y" | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          flutter doctor --android-licenses || true
+
       - name: Create local.properties for Flutter Android
         working-directory: apps/flutter-app
         run: |

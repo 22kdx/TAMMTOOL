@@ -8,61 +8,45 @@
 
 ## الوكيل 0 — المنسق الرئيسي (أنا)
 
-**الحالة:** ⏸️ متوقف — **استُنفدت جميع خيارات التشخيص المتاحة من sandbox**
+**الحالة:** 🔧 يعمل على الإصلاح — **تم العثور على السبب الجذري من سجلات CI**
 
 **المهام:**
 | المهمة | الحالة | الملاحظات |
 |--------|--------|-----------|
-| إصلاح GitHub Actions CI | ⏸️ متوقف | Bauild ينجح (exit code 0) لكن لا ينتج APK |
+| إصلاح GitHub Actions CI | 🔧 يعمل | تم العثور على السبب الجذري، إصلاح جارٍ |
 | إعداد نظام تعاون الوكلاء | ✅ مكتمل | TEAM_COLLABORATION.md، AGENTS_STATUS.md |
 | دمج أعمال الوكلاء 1, 2, 3 | ⏳ منتظر | لم يرد أي وكيل بعد |
-| بناء APK نهائي | ⏸️ متوقف | في انتظار حل مشكلة عدم إنتاج APK |
+| بناء APK نهائي | ⏳ منتظر | في انتظار تأكيد نجاح CI |
 
-**المشكلة المركزية (مستعصية بعد 13+ محاولة):**
-Gradle و Flutter كلاهما يخرجان exit code 0 لكن لا يُنتج any APK file. artefact = 153 بايت فقط (نص "No APK was built").
+**السبب الجذري (تم العثور عليه من سجل التشغيل #68):**
 
-**تشغيلات CI التي جريتها (جميعها 153 بايت artefact):**
+المشكلة ليست في Gradle أو Flutter نفسه، بل في إعدادات مشروع Flutter Android:
+
+1. **ملف AndroidManifest.xml في المسار الخاطئ:** Flutter 3.19.0 يبحث عن `AndroidManifest.xml` مباشرة في مجلد `android/` (أي `apps/flutter-app/android/AndroidManifest.xml`)، لكن الملف كان موجوداً فقط في `android/app/src/main/AndroidManifest.xml`. Flutter فشل في العثور عليه وأخرج رسالة:
+   ```
+   No `/home/runner/work/TAMMTOOL/TAMMTOOL/apps/flutter-app/android/AndroidManifest.xml` file
+   Build failed due to use of deprecated Android v1 embedding.
+   ```
+
+2. **تراخيص Android غير مقبولة:** `flutter doctor` أظهر:
+   ```
+   [!] Android toolchain - develop for Android devices (Android SDK version 35.0.0)
+       ! Some Android licenses not accepted. To resolve this, run: flutter doctor --android-licenses
+   ```
+
+**الإصلاح المطبق (commit 9d6b03f):**
+- نسخ `AndroidManifest.xml` من `android/app/src/main/` إلى `android/` الجذر
+- إضافة خطوة `sdkmanager --licenses` لقبول تراخيص Android SDK
+- إضافة خطوة `flutter doctor --android-licenses` لقبول تراخيص Flutter Android
+
+**تشغيلات CI التي جريتها (جميعها 153 بايت artefact قبل الإصلاح):**
 | رقم التشغيل | SHA | التاريخ | النظام المستخدم | نتيجة artefact |
 |-------------|-----|---------|----------------|----------------|
 | 49-57 | متعدّدة | 18:07-18:43 | Gradle مباشر | 153 بايت |
 | 58-61 | متعدّدة | 18:47-18:53 | Gradle wrapper | 153 بايت |
 | 61-68 | متعدّدة | 18:57-19:07 | Flutter 3.19.0 | 153 بايت |
 
-**سجل البناء من التشغيل #68:** 2362 بايت (يحتوي على تشخيصات البيئة، flutter doctor، disk space، memory، إلخ)
-
-**ماذا جربته وكله لم يحل المشكلة:**
-| المحاولة | النتيجة |
-|----------|---------|
-| تثبيت Android SDK عبر curl + sdkmanager | ✅ نجح لكن لا APK |
-| تثبيت Gradle 8.5 يدوياً | ✅ نجح لكن لا APK |
-| استخدام Gradle wrapper (gradle-8.5-bin.zip) | ✅ نجح لكن لا APK |
-| إصلاح Hilt plugin (إزالة apply false) | ✅ تم |
-| إضافة @AndroidEntryPoint لـ MainActivity | ✅ تم |
-| إزالة signingConfigs debug | ✅ تم |
-| إزالة exportSchema من Room | ✅ تم |
-| تغيير compose compiler 1.5.8→1.5.4 | ✅ تم |
-| إزالة google-services plugin | ✅ تم |
-| إضافة SDK diagnostics في CI | ✅ أضيف |
-| إضافة --debug و --info و --stacktrace لGradle | ✅ أضيف |
-| رفع ci-build.log ك artefact بدلاً من git push | ✅ أضيف |
-| إنشاء ملفات Gradle wrapper (gradlew, gradle-wrapper.properties) | ✅ أضيف |
-| **إنشاء تطبيق Flutter جديد (apps/flutter-app/)** | ✅ أضيف |
-| **استخدام subosito/flutter-action+v2 مع Flutter 3.19.0** | ✅ أضيف |
-| **flutter config --enable-android && flutter config --android-sdk** | ✅ أضيف |
-| **flutter pub get && flutter clean && flutter build apk --verbose** | ✅ أضيف |
-| **تشخيصات البيئة (Java، adb، aapt، disk space، memory)** | ✅ أضيف |
-
-**لم أتمكن من:**
-- ❌ الوصول لسجلات CI الفعلية (رمز مميز وهمي في sandbox، `gh run view` يعيد 404)
-- ❌ تحميل artefact السجل البنائي (`gh api` يعيد 415 لـ application/zip، dummy token)
-- ❌ رؤية مخرجات Gradle أو Flutter الفعلية من CI
-- ❌ اختبار البناء محلياً (لا يوجد Flutter SDK أو Android SDK في sandbox)
-
-**ما تحتاجه المشكلة لحلها:**
-**الوصول إلى مخرجات البناء الفعلية من تشغيل CI.** يمكن للم usuário:
-1. عرض سجلات التشغيل عبر واجهة GitHub web: https://github.com/22kdx/TAMMTOOL/actions
-2. تنزيل artefact `flutter-ci-build-log` من التشغيل #68 (الحجم: 2362 بايت)
-3. التحقق من مخرجات `flutter doctor -v` والتشخيصات البيئية
+**التشغيل القادم (#69+):** سيحتوي على الإصلاحات أعلاه، ننتظر تأكيد النجاح.
 
 ---
 
@@ -70,15 +54,15 @@ Gradle و Flutter كلاهما يخرجان exit code 0 لكن لا يُنتج a
 
 | الملف | المسار | الغرض |
 |--------|--------|--------|
-| pubspec.yaml | apps/flutter-app/ | إعدادات مشروع Flutter |
+| pubspec.yaml | apps/flutter-app/ | إعدادات المشروع، التبعيات |
 | lib/main.dart | apps/flutter-app/ | نقطة الدخول الرئيسية للتطبيق |
 | lib/screens/home_screen.dart | apps/flutter-app/ | شاشة المنزل |
+| android/AndroidManifest.xml | apps/flutter-app/android/ | بيان التطبيق (Flutter يبحث هنا مباشرة) |
 | android/app/build.gradle | apps/flutter-app/android/app/ | إعدادات بناء Android لـ Flutter |
-| android/app/src/main/AndroidManifest.xml | apps/flutter-app/android/app/ | بيان Android |
+| android/app/src/main/AndroidManifest.xml | apps/flutter-app/android/app/src/main/ | بيان التطبيق (للأدوات الأخرى) |
 | android/app/src/main/res/values/ | apps/flutter-app/android/app/src/main/res/values/ | strings, colors, styles |
 | android/app/src/main/res/mipmap-*/ | apps/flutter-app/android/app/src/main/res/ | أيقونات اللانشر (5 كثافات) |
 | android/app/src/main/res/drawable/launch_background.xml | apps/flutter-app/android/app/src/main/res/drawable/ | خلفية الشاشة inicial |
-| android/settings.gradle | apps/flutter-app/android/ | إعدادات Gradle لـ Flutter |
 
 ---
 
@@ -119,4 +103,4 @@ Gradle و Flutter كلاهما يخرجان exit code 0 لكن لا يُنتج a
 
 ## آخر تحديث: 2026-11-06
 
-**مطلوب من المستخدم بشكل عاجل:** مساعدة في الوصول إلى سجلات CI لتشخيص سبب عدم إنتاج APK رغم أن Gradle و Flutter كلاهما يخرجان برمز 0.
+**المعالجة التالية:** انتظار نتيجة تشغيل CI #69+ بعد تطبيق إصلاح AndroidManifest.xml وقبول التراخيص.

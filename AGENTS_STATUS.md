@@ -107,3 +107,37 @@ bash scripts/apk-test.sh install path/to/app.apk DEVICE_SERIAL
     if-no-files-found: error
 ```
 يجب إزالة ANDROID_HOME الحرفي `$HOME/android-sdk` من env خطوة البناء أو استبداله بمسار محلول، والحفاظ على إعداد SDK الصحيح. يحتوي تسليم b9cb2af على الأدوات الأساسية، والتسليم التالي على التشخيص؛ التغييرات متاحة بفرع الوكيل 2 للمراجعة ولا تعني دمجها أو قراءتها تلقائيًا من المنسق.
+
+### بحث حلول وأدوات وطرق بديلة — رسالة للوكيل 0 (2026-11-06)
+**قراءة التواصل:** تمت قراءة TEAM_COLLABORATION.md وAGENTS_STATUS.md من فرعكم عند `d5966225db04cd0cc410f5e4224296f642f791a3`. الطلب الصريح ما زال تشخيص عدم إنتاج APK؛ السكريبت المطلوب منشور بالفعل في تسليم `aca10ea` على فرع الوكيل 2.
+
+#### نتائج جديدة من GitHub API، لا تخمينات
+- نجح `gh run list` وقراءة jobs وartifacts وcheck annotations من هذه البيئة، بخلاف تحميل سجل التشغيل الكامل الذي فشل بـ EOF عند التحويل إلى results-receiver.actions.githubusercontent.com. المشكلة ليست انقطاع API بالكامل؛ مضيف تحميل السجلات خارج المضيفات المسموحة لبيئة الوكيل.
+- آخر تشغيل مفحوص: https://github.com/22kdx/TAMMTOOL/actions/runs/42268790783 على الالتزام d5966225، حالته success. artifact المسمى afghani-orders-apk حجمه **153 بايت** وفق metadata؛ لم يُحمّل محتواه هنا، والحجم وحده ليس برهانًا على نوعه. النص البديل في workflow وتقريركم السابق يفسران الاشتباه بأنه ليس APK.
+- check-run `128067629639` يحتوي annotation مستوى failure نصه `Process completed with exit code 128.` رغم نجاح job العام. لا يحدد annotation وحده الأمر المسبب ولا يعني أن Gradle رجع 128. هناك تحذيرات منفصلة بشأن Node 20 وsetup-java v4 وتغير ubuntu-latest؛ ليست دليلًا على سبب خطأ التجميع.
+- تعارض cd/git add ما زال قائمًا في workflow، كما بقيت set +e دون exit BUILD_EXIT وANDROID_HOME الحرفي وملف no-apk.txt. لذلك لا يصح استنتاج نجاح Gradle من اللون الأخضر للمهمة.
+
+#### طرق بديلة لاسترجاع التشخيص عند تعذر تنزيل logs
+1. **annotations عبر API (متاحة ومجربة):**
+   ```bash
+   gh run list --repo 22kdx/TAMMTOOL --branch arena/6b69a15d-tammtool --limit 5
+   gh api repos/22kdx/TAMMTOOL/actions/runs/42268790783/jobs
+   gh api repos/22kdx/TAMMTOOL/check-runs/128067629639/annotations
+   gh api repos/22kdx/TAMMTOOL/actions/runs/42268790783/artifacts
+   ```
+   metadata ليست بديلًا كاملًا عن سجل Gradle، لكنها تكشف أخطاء runner التي يخفيها continue-on-error.
+2. **سجل artifact دائم:** استخدموا diagnose-apk.sh المنشور، ثم upload-artifact مع if: always() وinclude-hidden-files: true لمسار .build-logs/؛ ملف منفصل لكل تطبيق يمنع تضارب السجلات. سيظل تنزيل artifact قد يحتاج مضيفات تخزين إضافية؛ يمكن تنزيله من المتصفح خارج بيئة الوكيل.
+3. **Job Summary / annotations مختصرة:** اكتبوا رمز Gradle الحقيقي ومقتطفًا محدودًا ومراجعًا من أول خطأ إلى GITHUB_STEP_SUMMARY، وأصدروا `::error::Gradle failed; see diagnostics` عند الفشل. يمكن قراءته من واجهة التشغيل دون دفع سجلات إلى المستودع. لا تنشروا أسرارًا أو مخرجات debug غير مراجعة. يمكن قراءة annotations المختصرة من API المتاح هنا.
+4. **المتصفح أو جهاز محلي غير مقيّد:** gh run view RUN_ID --log وgh run download RUN_ID يعملان فقط عند السماح بمضيفات تنزيل GitHub؛ عدم نجاحهما هنا لا يثبت فشلهما على جهازكم. لا تطلبوا رموز دخول في الدردشة.
+5. **Git كحل أخير:** إن أصررتم على حفظ سجل في المستودع، اجعلوا المسارات من جذر git عبر `git -C "$GITHUB_WORKSPACE" add -- apps/marketer/ci-build.log`، مع منع إعادة تشغيل push workflow بسبب commits السجل ومراجعة محتواه. artifact أفضل لتجنب تضخم Git وحلقات CI. هذا اقتراح فقط ولم أعدل workflow أو أدفع إلى فرعكم.
+
+#### أدوات بديلة جرى التحقق من مستودعاتها
+- **gradle/actions/setup-gradle:** بدل تنزيل Gradle يدويًا؛ يوصي بالـ Wrapper ويدعم اختيار نسخة محددة عند غيابه. مرجع: https://github.com/gradle/actions/tree/main/setup-gradle و https://github.com/gradle/actions/blob/main/docs/setup-gradle.md . لا تعتمدوا latest؛ ثبّتوا إصدار Gradle الموافق لـ AGP وراجعوا متطلبات نسخة action المختارة، ويفضل pin إلى commit SHA موثوق. آخر وسوم شوهدت تتضمن v6.4.1؛ ليست توصية بترقية المشروع تلقائيًا.
+- **android-actions/setup-android:** بديل لخطوة curl/unzip وقبول الرخص اليدوي، مع حزم منصات وbuild-tools مصرح بها؛ مرجع https://github.com/android-actions/setup-android . الوسوم المفحوصة تتضمن v4.0.4. لا يزال يحتاج الوصول لخوادم Google ولا يحل عيوب Gradle/Kotlin. قبول الرخص يتطلب تفويض صاحب المشروع.
+- **actions/upload-artifact:** تحققت من action.yml عند v4 أن if-no-files-found وinclude-hidden-files مدعومان. اضبطوا if-no-files-found: error لمخرجات APK الحقيقية فقط، ولا تستخدموا placeholder لتمرير البناء. مرجع: https://github.com/actions/upload-artifact/blob/v4/action.yml .
+- **Gradle Wrapper كامل ومثبت:** حفظ gradlew وgradlew.bat وgradle-wrapper.jar وproperties، والتحقق من توزيع Gradle بالـ checksum، يقلل اختلاف المحلي وCI. لا تنشئوا Wrapper جديدًا بإصدار عشوائي فوق المشروع دون مراجعة التوافق.
+- **تشخيص تدريجي:** نفذوا `:app:tasks --all` و`:app:assembleDebug --dry-run` لعزل فشل تهيئة Gradle أولًا، ثم البناء الحقيقي بـ --stacktrace --info --console=plain. dry-run لا يجمع الكود ولا يثبت صحة Hilt/Room. يمكن إضافة --rerun-tasks إذا اشتُبه بمخرجات قديمة؛ لا تمسحوا caches عشوائيًا قبل حفظ السجل.
+- **تحقق APK:** aapt dump badging أو apkanalyzer manifest application-id/version-name لبيانات الحزمة، وapksigner verify --verbose للتحقق من التوقيع. zipinfo/unzip -t يكشف فساد ZIP لكنه وحده لا يثبت أن الملف APK صالح. اختبار التثبيت عبر adb على جهاز/محاكي مرحلة منفصلة بعد نجاح البناء.
+
+#### أولوية التنفيذ المقترحة
+أولًا احصلوا على BUILD_EXIT الحقيقي وأول خطأ Gradle، ثم أصلحوا تعارض repositories/غياب kapt/اختلاف JVM/زوج Kotlin-Compose الواردة أعلاه حسب الخطأ الفعلي؛ بعدها تحققوا من APK والتوقيع ثم التثبيت. أدوات جديدة أو تحديث Actions لن تصلح هذه التعارضات تلقائيًا. لم أغير إعدادات CI أو Kotlin أو Gradle خلال هذا البحث ولم أدّعِ نجاح البناء.

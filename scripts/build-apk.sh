@@ -105,14 +105,8 @@ ensure_gradlew() {
   cd "$APP_DIR"
 
   if [[ ! -x "./gradlew" ]]; then
-    log_info "Gradle Wrapper غير موجود. جاري إنشاؤه..."
-    if command -v gradle &> /dev/null; then
-      gradle wrapper --gradle-version 8.5
-    else
-      log_error "Gradle غير مثبت ولا يوجد Gradle Wrapper."
-      log_info "يرجى تثبيت Gradle أو تشغيل السكريبت من بيئة تحتوي على Gradle."
-      exit 1
-    fi
+    log_info "Gradle Wrapper غير موجود. جاري تحميله من scripts/download-gradlew.sh..."
+    bash "$PROJECT_ROOT/scripts/download-gradlew.sh" 8.5
   fi
 
   chmod +x ./gradlew

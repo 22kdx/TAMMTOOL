@@ -121,6 +121,9 @@ jobs:
         continue-on-error: true
         run: |
           set +e
+          echo "=== ci-build.log content ==="
+          cat apps/marketer/ci-build.log 2>/dev/null || echo "ci-build.log not found"
+          echo ""
           echo "=== Build directory structure ==="
           find apps/marketer/app/build -type f 2>/dev/null | head -50 || echo "No build directory found"
           echo ""

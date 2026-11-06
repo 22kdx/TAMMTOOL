@@ -60,6 +60,7 @@ jobs:
       - name: Configure Flutter for Android
         run: |
           flutter config --enable-android
+          flutter config --android-sdk $HOME/android-sdk
           echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
           flutter doctor -v
 
@@ -75,6 +76,11 @@ jobs:
         working-directory: apps/flutter-app
         run: |
           flutter pub get
+
+      - name: Clean Flutter build
+        working-directory: apps/flutter-app
+        run: |
+          flutter clean
 
       - name: Build Flutter APK (verbose diagnostics)
         working-directory: apps/flutter-app
@@ -124,10 +130,10 @@ jobs:
           cat apps/flutter-app/ci-build.log 2>/dev/null || echo "ci-build.log not found"
           echo ""
           echo "=== Searching for APK files ==="
-          find apps/flutter-app/build -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
+          find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
           echo ""
           echo "=== Uploading APK artifact ==="
-          APK_PATH=$(find apps/flutter-app/build -name "*.apk" -type f 2>/dev/null | head -1)
+          APK_PATH=$(find . -name "*.apk" -type f 2>/dev/null | head -1)
           if [[ -n "$APK_PATH" ]]; then
             echo "Found APK: $APK_PATH"
             mkdir -p apk-output

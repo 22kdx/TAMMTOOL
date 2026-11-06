@@ -1,0 +1,27 @@
+{
+  "source": "github.com/gradle/gradle",
+  "tag": "v8.7.0",
+  "fetched": "2026-11-06",
+  "files": {
+    "gradle/wrapper/gradle-wrapper.jar": {
+      "bytes": 43453,
+      "sha256": "cb0da6751c2b753a16ac168bb354870ebb1e162e9083f116729cec9c781156b8",
+      "gh_blob_sha": "e6441136f3d4ba8a0da8d277868979cfbc8ad796"
+    },
+    "gradle/wrapper/gradle-wrapper.properties": {
+      "bytes": 255,
+      "sha256": "ed5db9349cbf852e08205db28ce5a69f6aa647d281b7c28b9052bcf07841c557",
+      "gh_blob_sha": "b97bde2c8c7b4f1968f110cef7e5d6d166c825e3"
+    },
+    "gradlew": {
+      "bytes": 8714,
+      "sha256": "bf2ca3f9d7c42b831380b47ab9e7594ddc33054b3e09253a0c4862353d5d604b",
+      "gh_blob_sha": "97de990bb40fb164c0a4375b3817be2ad053d68a"
+    },
+    "gradlew.bat": {
+      "bytes": 2848,
+      "sha256": "e54283c0f86074fa408c1161d08ef8f63992323a8c940c66f3626e8abc5bd8cc",
+      "gh_blob_sha": "16e26a11510cfd12f1d0498a7252758a1b1dbd72"
+    }
+  }
+}

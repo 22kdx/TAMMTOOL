@@ -191,7 +191,7 @@ DAO واحد + اختبار ViewModel لتسجيل الدخول (يمنع C1 م�
 | # | خطوة | أمر إنهاء مُلزم |
 |---|---|---|
 | 1 | `git am patches/0001` و`patches/0002` (على `74f0a54`) و`patches/0003` (على `8f92000`) | `bash -n scripts/android-sdk-setup.sh` سليم؛ `jvmargs` موجود في الملفين؛ `room.schemaLocation` في الملفين |
-| 2 | دمج `apps/` من `ff5110e8` + `scripts/` والوثائق من `arena/68a3e358-tammtool` | `bash scripts/tests/mock-smoke.sh` = 89/89 |
+| 2 | دمج `apps/` من `ff5110e8` + `scripts/` والوثائق من `arena/68a3e358-tammtool` | `bash scripts/tests/mock-smoke.sh` = 90/90 |
 | 3 | بناء محلي (لا يحتاج CI): `./scripts/build-apk.sh debug marketer --yes --low-memory` | `dist/marketer-debug-<ver>-<sha>.apk` أكبر من 1MB و`./scripts/apk-test.sh validate` rc=0 |
 | 4 | رفع الـ workflow المصلَّح (A4) | `./scripts/ci-logs.sh <run> --gate; echo $?` → `0` وأثر APK > 1MB |
 | 5 | قرار B1/B2 (توقيع) + قرار C2 (شبكة أم MVP محلي) | `bundle` موقّع في `dist/` + بصمة = بصمة Console |
@@ -221,14 +221,14 @@ DAO واحد + اختبار ViewModel لتسجيل الدخول (يمنع C1 م�
 ## 7. الحالة بعد التنفيذ — ما أُصلح فعلاً في `arena/68a3e358-tammtool`
 
 «مُطبَّق» = التعديل في الشيفرة + كل ما يمكن التحقق منه بلا Gradle (بناء `bash -n`، تحليل XML/YAML،
-`git diff --check`، `scripts/tests/mock-smoke.sh` 89/89، توازن أقواس Kotlin، ومحاكاة منطق التجزئة في Python).
+`git diff --check`، `scripts/tests/mock-smoke.sh` 90/90، توازن أقواس Kotlin، ومحاكاة منطق التجزئة في Python).
 «لا يزال» = يحتاج Gradle/شبكة/قرار منتج لا يملكه هذا الفرع.
 
 | البند | الحالة | ما تم بالضبط | كيف تتحقق |
 |---|---|---|---|
 | **A1** مخطط Room | ⚠️ مُطبَّق بسقطة | `kapt { room.schemaLocation }` + `app/schemas/` في التطبيقين + `androidTest.assets.srcDir` ليقرأ `MigrationTestHelper` المخططات المرفوعة | `grep -n schemaLocation apps/*/app/build.gradle.kts` |
 | **A2** ذاكرة Gradle | ✅ مُطبَّق (أُعيد) | ضبطته `patches/0002` على فرع آخر، **فضاعت في الدمج** (أخذ `apps/*/gradle.properties` نسخة فرع الكود الخالية منها) — فأعدته هذه الجولة بـ `-Xmx4g -XX:MaxMetaspaceSize=1g` + `kotlin.daemon.jvmargs=-Xmx1536m` + `kapt.workers.isolation=process` + `android.enableJetifier=false`. الدرس موثّق في §8 | `grep -n jvmargs apps/*/gradle.properties` |
-| **A3** الـ Wrapper | ⚠️ جزئي | `download-gradlew.sh` صار يحترم وسيط النسخة (كان يكتب 8.5 دائماً)، افتراضيه 8.7، واكتشاف المشاريع آلياً (4 مشاريع مُختبَرة هنا). **`gradle-wrapper.jar` لا يزال غير مرفوع** — التحميل من `services.gradle.org` محجوب في هذه البيئة | `bash scripts/download-gradlew.sh 8.7 --dry-run` + `git ls-files apps/*/*/gradle/wrapper` |
+| **A3** الـ Wrapper | ✅ حُلّت للأدوات (2026‑11‑06 ليلاً) | `download-gradlew.sh` صار يحترم وسيط النسخة (كان يكتب 8.5 دائماً)، افتراضيه 8.7، واكتشاف المشاريع آلياً (4 مشاريع مُختبَرة هنا). **حُلّت بهذه الطريقة**: وُسِمَت نسخة Gradle 8.7.0 من `gradle/gradle` وجُلب `gradlew`+`gradlew.bat`+`gradle-wrapper.jar`+properties عبر `api.github.com` (المسموح هنا) ووُضعت في `tools/vendor/gradle-wrapper/8.7.0/` مع `manifest.json` بالبصمات، ويُزرع أي مشروع بأمر — مُجرَّب: `tools/scaffold-filter-app.sh --wrapper` زرعه في `apps/filter` و`build-apk.sh debug filter --dry-run` اختاره تلقائياً (` المشغّل: Gradle (wrapper)`). لم يُرفع بعد إلى `apps/marketer`/`orders-delivery` (قرار الوكيل 0: `./tools/install-gradle-wrapper.sh --apps`) | `bash tools/install-gradle-wrapper.sh --verify` + `bash tools/tests/toolchain-smoke.sh \| tail -2` |
 | **A4** CI الأخضر الزائف | ✅ مُطبَّق | `.github/workflows/build-apk.yml` استُبدل بالنسخة المقترحة: 12 خطوة، matrix للتطبيقين، **بوّابة «APK حقيقي > 1MB»**، رفع السجل كـ artifact (لا `git add`)، `annotations` من `* What went wrong:`، بلا `contents: write` | `python3 -c "import yaml;d=yaml.safe_load(open('.github/workflows/build-apk.yml'));print(len(d['jobs']['build']['steps']))"` → 12 |
 | **A5** `android-sdk-setup.sh` | ✅ مُطبَّق | السطر 83 `<<<<>>> echo …` → `echo …`؛ معلق كوري → عربي؛ «síesno» → «sdkmanager». `bash -n` نظيف | `bash -n scripts/android-sdk-setup.sh` |
 | **B1** توقيع الإصدار | ✅ مُطبَّق | `signingConfigs.create("release")` يُبنى فقط إن وُجد `keystore.properties` في الجذر، و`release` يشير إليه — بدونه يبقى السلوك القديم (ملف غير موقّع) بلا فشل جديد | `grep -n signingConfig apps/marketer/app/build.gradle.kts` |
@@ -255,7 +255,7 @@ DAO واحد + اختبار ViewModel لتسجيل الدخول (يمنع C1 م�
 ```bash
 git fetch origin && git merge --no-ff origin/arena/68a3e358-tammtool
 bash scripts/check-env.sh                      # يجب أن يفشل بفقرتي wrapper فقط
-bash scripts/tests/mock-smoke.sh | tail -2     # 89/89
+bash scripts/tests/mock-smoke.sh | tail -2     # 90/90
 ./scripts/download-gradlew.sh 8.7              # ينشئ gradlew لكل مشروع مُكتشَف
 git add -f apps/*/gradle/wrapper/gradle-wrapper.jar apps/*/gradlew && git commit -m "chore: add gradle wrapper"
 gh run watch                                   # الآن الفشل الحقيقي يظهر، لا «نجاح» فارغ
@@ -269,7 +269,7 @@ gh run watch                                   # الآن الفشل الحقي�
 للوظيفتين `build (marketer)` و`build (orders-delivery)`.
 
 **هذا نجاح للأدوات قبل أن يكون فشلاً للبناء:** كل خطوات البنية مرّت — `Install Android SDK` ✓
-(كان ينكسر على خطأ صيغة `android-sdk-setup.sh:83`)، `Install Gradle 8.7` ✓، `Self-test` ✓ (89/89)،
+(كان ينكسر على خطأ صيغة `android-sdk-setup.sh:83`)، `Install Gradle 8.7` ✓، `Self-test` ✓ (90/90)،
 والفشل ظهر في **خطوة البناء الحقيقية** لا كـ«نجاح» فارغ؛ وخطوة الـ annotations نقلت السبب عبر API
 بلا حاجة للسجل الخام (`./scripts/ci-logs.sh <run-id>`، و`gh run view --log` لا يعمل من هنا:
 يفشل على `results-receiver.actions.githubusercontent.com` — مُجرَّب على `42273871179`).

@@ -283,7 +283,7 @@ adb install -r ./ci-apk/*.apk                      # خطأ البصمة = INSTA
 
 لا `keytool`/`apksigner`/`zipalign` ولا شبكة كاملة هنا، فلم أُنتج keystore ولم أوقّع ملفاً؛
 كل ما فوق مكتوب من الملفات الفعلية للفروع (`build.gradle.kts`، `scripts/sign-apk.sh`) ومن
-سلوك `build-apk.sh`/`apk-test.sh` المغطّى بـ `scripts/tests/mock-smoke.sh` (89 فحصاً).
+سلوك `build-apk.sh`/`apk-test.sh` المغطّى بـ `scripts/tests/mock-smoke.sh` (90 فحصاً).
 القيود التي تبقى عند التنفيذ الحقيقي: تسمية مخرجات Gradle لـ release (`app-release-unsigned.apk`
 عند غياب `signingConfig`)، ووجود `mapping.txt` فعلي بعد R8 — يختبرهما من يشغّل القسم 2 أو 3
 ويُحدّث هذا القسم بنتيجته.

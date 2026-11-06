@@ -17,7 +17,7 @@
 | **0 — المنسّق** | إصلاح CI، قراءة السجلات، الدمج، APK نهائي | 🔴 يحتاج تدخلاً | فرعاه: `6b69a15d` (CI) · `ff5110e8` (كود) | **CI «أخضر زائف»**: run `42267633951` = success مع artifact وحيد `afghani-orders-apk` بحجم **153 بايت** (placeholder) · run `42266809044` = success بلا أي artifact · السبب الجذري الأصلي `Java heap space` (run `42264822833`) لم يُصلَّح بعد |
 | **1 — مراجعة الكود** | Kotlin/Gradle للتطبيقين | 🟢 تقدّم واضح (لم يحدّث قسمه) | `arena/ff5110e8-tammtool` | أصلح kapt · `VERSION_17` · Compose 1.5.8/Kotlin 1.9.22 + AGP 8.6.1 · حذف ملف `res/values/*.placeholder` · أزال `allprojects { repositories }`. **باقٍ:** `gradle.properties` بلا `jvmargs` |
 | **2 — الأدوات والسكريبتات** | `scripts/*.sh` | 🟡 تداخل مع الوكيل 3 | `arena/6b69a15d-tammtool` | 6 سكربتات؛ **`android-sdk-setup.sh` سطر 83 معطّل الصياغة**؛ `sign-apk.sh` يمرّر كلمات السر في argv |
-| **3 — التوثيق والتقارير** | وثائق + سكربتات البناء/الاختبار + قراءة CI | 🟢 **منجَز ومسلَّم** | `arena/68a3e358-tammtool` (HEAD `fe81f1c` فروع أخرى تتحرك) | `BUILD_GUIDE.md` · `TROUBLESHOOTING.md` · `scripts/README.md` · `build-apk.sh` v2.1 · `apk-test.sh` v2 · `ci-logs.sh` (جديد) · `tests/mock-smoke.sh` (89/89 ✓) |
+| **3 — التوثيق والتقارير** | وثائق + سكربتات البناء/الاختبار + قراءة CI | 🟢 **منجَز ومسلَّم** | `arena/68a3e358-tammtool` (HEAD `fe81f1c` فروع أخرى تتحرك) | `BUILD_GUIDE.md` · `TROUBLESHOOTING.md` · `scripts/README.md` · `build-apk.sh` v2.1 · `apk-test.sh` v2 · `ci-logs.sh` (جديد) · `tests/mock-smoke.sh` (90/90 ✓) |
 
 **الحالة الإجمالية للمشروع:** 🔴 لا APK من CI ولا بناء محلي موثَّق النجاح. قائمة الفجوات كاملة
 بطبقاتها وملاكها: [`GAP_TO_APK.md`](GAP_TO_APK.md) — وأهم بندٍ فيها لم يذكره أحد:
@@ -40,13 +40,13 @@
 | 3 | `scripts/README.md` | مرجع كامل لسكربتات `scripts/`: الأوامر، جداول الخيارات، متغيرات البيئة، رموز الخروج، أمثلة، وما يفعله كل سكربت بالترتيب | قُورن كل سطر بالسكربت الفعلي لا بوصفه |
 | 4 | `scripts/build-apk.sh` v2.0 | اكتشاف JDK/SDK/Gradle، توليد Wrapper عند غيابه، تحميل Gradle محلياً بلا `sudo`، **تثبيت SDK داخلياً عند تلف `android-sdk-setup.sh`**، كتابة `local.properties`، نسخ المخرج إلى `dist/` مع SHA-256 وملخص `latest-*.env`، تشخيص فشل البناء من السجل، `--dry-run/--offline/--low-memory/--all/--print-env/--yes`، قفل يمنع بناءين متزامنين، متوافق مع bash 3.2 (macOS) | `shellcheck -S warning` نظيف · `bash -n` سليم · تغطية في `mock-smoke.sh` §2 (32 حالة) |
 | 5 | `scripts/apk-test.sh` v2.0 | فصل الفحص الثابت عن الحيّ: `validate`/`info` بلا هاتف، و`test` بفحوص حقيقية (تثبيت · تشغيل · `pidof` · بحث `FATAL`/ANR · لقطة · تقرير md/json)، تشخيص `INSTALL_FAILED_*`، `--serial/--reinstall/--grant/--allow-downgrade`، `connect` للـ WiFi، `emulator --create`، `doctor`، `selftest`، رموز خروج 0–5 | تغطية في mock-smoke.sh §3 (41 حالة) + `apk-test.sh selftest` خاصة به |
-| 6 | `scripts/tests/mock-smoke.sh` | 89 فحصاً للسكربتَين بأدوات مزيفة في `/tmp` — بلا Android، بلا JDK، بلا إنترنت | `✓ كل الفحوص نجحت (89)`، وثلاث تشغيلات متتالية بنتيجة واحدة |
+| 6 | `scripts/tests/mock-smoke.sh` | 90 فحصاً للسكربتَين بأدوات مزيفة في `/tmp` — بلا Android، بلا JDK، بلا إنترنت | `✓ كل الفحوص نجحت (90)`، وثلاث تشغيلات متتالية بنتيجة واحدة |
 | 7 | `.gitignore` | استثناء `dist/` و`build-logs/` و`test-reports/` و`screenshots/` و`local.properties` ومفاتيح التوقيع | — |
 | 8 | `scripts/ci-logs.sh` (جديد) | قراءة نتائج Actions عبر `api.github.com` فقط: خطوات الـ run، الـ annotations، أحجام الـ artifacts، وحكم «أخضر زيف» + `--gate` كبوابة CI + `--json` | **اختُبر على المستودع الحقيقي**: أظهر `Java heap space` لـ run `42264822833` ووصف run `42267633951` بالزيف (153B) — `--gate` يرجع 1 |
 | 9 | `PLAY_STORE_RELEASE.md` (جديد) | مسار النشر: قرار AAB/APK، توليد keystore وقواعد عدم فقدانه، `signingConfig` مقابل `sign-apk.sh`، R8 و`mapping.txt`، `versionCode`، جدول قائمة Play Console، جدولة أخطاء التوقيع، وقائمة تحقق قبل Publish | مبني على `apps/*/build.gradle.kts` (versionCode 1 · minify true · **بلا signingConfig**) و`scripts/sign-apk.sh`؛ لم يوقَّع ملف فعلياً هنا (لا `keytool`/`apksigner`) — موثّق في §9 منه |
 | 10 | `patches/` (جديد) | رقعتان `git am`-ready لأساس `74f0a54` (0001 CI+sdk-setup، 0002 ذاكرة Gradle) + `0003` لأساس `8f92000` (Room schema) + `build-apk.yml.proposed` + `README.md` | طُبّقت بـ `git am` على أساسه في worktree نظيف: `bash -n` لـ `android-sdk-setup.sh` سليم، YAML صالح وكل خطوات `run` تمرّ بـ `bash -n`، و`jvmargs` في التطبيقين |
 | 11 | `GAP_TO_APK.md` (جديد) | إجابة «ما الذي ينقص لإنتاج التطبيق»: 16 بنداً في 3 طبقات (بناء · إصدار · وظيفة/سياسة) + ترتيب تنفيذ من 7 خطوات | كل بند بحجة أمر `git show`/`git grep` قابل للتكرار (القائمة في آخر الملف §6)؛ لم يُشغَّل Gradle — §6 يفرّق المستنتج من المرئي |
-| 12 | `build-apk.sh` v2.1 | إضافة قبول `TAMM_GRADLE_BIN=gradle` (اسم أمر، ليس مساراً) لتفادي توليد Wrapper في CI وتسريع التشغيل | shellcheck نظيف + mock-smoke 89/89 |
+| 12 | `build-apk.sh` v2.1 | إضافة قبول `TAMM_GRADLE_BIN=gradle` (اسم أمر، ليس مساراً) لتفادي توليد Wrapper في CI وتسريع التشغيل | shellcheck نظيف + mock-smoke 90/90 |
 
 **الكوميتات:** `b0cea60` (السكربتات + `BUILD_GUIDE.md`) + كوميت التوثيق الحالي على `arena/68a3e358-tammtool`.
 
@@ -159,7 +159,7 @@ APK نهائي: لا شيء — كل artifacts آخر تشغيلات إما plac
 |---|---|---|
 | 2026-11-06 | 3 | جرد فروع الفريق: كل تطبيق مشروع Gradle مستقل داخل `apps/<app>`، لا Wrapper مرفوع، CI يستخدم Gradle 8.7 + JDK 17 + `platforms;android-35` + `build-tools;34.0.0` |
 | 2026-11-06 | 3 | استخراج سبب فشل CI من GitHub Check annotations (بديل يعمل حين يُحجب `--log-failed`) |
-| 2026-11-06 | 3 | إعادة كتابة `build-apk.sh` و`apk-test.sh` (v2.0) + `tests/mock-smoke.sh` (89 فحصاً) + `.gitignore` |
+| 2026-11-06 | 3 | إعادة كتابة `build-apk.sh` و`apk-test.sh` (v2.0) + `tests/mock-smoke.sh` (90 فحصاً) + `.gitignore` |
 | 2026-11-06 | 3 | توثيق: `BUILD_GUIDE.md` · `TROUBLESHOOTING.md` · `scripts/README.md` · `AGENTS_STATUS.md` · `TEAM_COLLABORATION.md` |
 | 2026-11-06 | 3 | دفعة إلى `origin/arena/68a3e358-tammtool` (الكوميتان `b0cea60` ثم `fe81f1c`) |
 | 2026-11-06 | 3 | قراءة CI بـ `gh api` فقط: تبيّن أن نجاحات اليوم **زائفة** (153B placeholder، لا artifact، `BUILD_EXIT` غير مفحوص، `*.log` مُتجاهَل) |
@@ -177,7 +177,7 @@ APK نهائي: لا شيء — كل artifacts آخر تشغيلات إما plac
 |---|---|---|---|
 | 1 | `git am patches/0002` (رقعة A: `org.gradle.jvmargs` في `apps/*/gradle.properties`) | 0 (أو 1) | لا `Java heap space` في `./scripts/ci-logs.sh <run>` |
 | 2 | `git am patches/0001` أو `cp patches/build-apk.yml.proposed` (workflow بلا `set +e`، بلا placeholder، مع Gate وannotations) | 0 | `./scripts/ci-logs.sh <run> --gate; echo $?` → `0` فقط مع APK > 1MB |
-| 3 | دمج `apps/` من `ff5110e8` + `scripts/` والوثائق من `68a3e358` | 0 | `bash scripts/tests/mock-smoke.sh` = 89/89 + PR أخضر حقيقي |
+| 3 | دمج `apps/` من `ff5110e8` + `scripts/` والوثائق من `68a3e358` | 0 | `bash scripts/tests/mock-smoke.sh` = 90/90 + PR أخضر حقيقي |
 | 4 | إصلاح `android-sdk-setup.sh` سطر 83 و`download-gradlew.sh`/`check-env.sh` | 2 | `bash -n` نظيف على كل `scripts/*.sh` |
 | 5 | توحيد build-tools (CI `34.0.0` مقابل `compileSdk 35`) ونسخة Gradle 8.7 | 0 + 1 | سطر واحد في مكان واحد مذكور في `BUILD_GUIDE.md` §5 |
 | 6 | تنزيل APK من CI وفحصه بلا جهاز | 3 | `./scripts/apk-test.sh validate <apk>` = rc 0 |
@@ -212,7 +212,7 @@ APK نهائي: لا شيء — كل artifacts آخر تشغيلات إما plac
 | — | androidTest على جهاز + أيقونات PNG لـ orders + Coil/Timber غير مستخدمين (C7) | ⛔ جزئي | الاختبارات الوحدة أُضيفت؛ الباقي يحتاج محاكي (1) أو قرار إزالة التوابع |
 
 **أوامر التحقق التي أُجريت هنا (بلا JDK) — كلها خضراء:** `bash -n scripts/*.sh`،
-`bash scripts/tests/mock-smoke.sh` (89/89)، تحليل `xml.etree` للمانيفستات وملفات `res/xml`،
+`bash scripts/tests/mock-smoke.sh` (90/90)، تحليل `xml.etree` للمانيفستات وملفات `res/xml`،
 `yaml.safe_load` للـ workflow (12 خطوة)، توازن أقواس كل ملف Kotlin معدل، ومحاكاة منطق صيغة
 PBKDF2 بسبع حالات (round‑trip/خطأ/نص صريح/ملح/تلاعب/حقول قصيرة/iterations ضعيفة).
 **لم يُجرَّب:** ترجمة Kotlin، تشغيل Gradle، توقيع، محاكي — لايزال الحكم لها لـ CI.
@@ -347,7 +347,7 @@ gh api repos/22kdx/TAMMTOOL/actions/jobs/<JOB_ID> --jq '.steps[].name'   # إن 
 
 ```bash
 git fetch origin && git merge --no-ff origin/arena/68a3e358-tammtool   # سيختلف .github/workflows/build-apk.yml — خُذ نسختي
-bash scripts/tests/mock-smoke.sh | tail -2                              # متوقع: 89/89
+bash scripts/tests/mock-smoke.sh | tail -2                              # متوقع: 90/90
 git push origin arena/6b69a15d-tammtool                                 # الآن فِلترك يبني كل شيء مُجموعاً
 gh run watch                                                             # إن فشل: ./scripts/ci-logs.sh <run>
 ```
@@ -402,3 +402,53 @@ grep -n "room\." apps/marketer/app/build.gradle.kts   # يجب أن يبقى sch
 **لا شيء آخر أحتاجه منك الآن**، ولن أشغّل CI ولا أعدّل `apps/` أو `.github/` من تلقاء نفسي. إن أردت مني
 شيئاً فهو من هذه القائمة فقط: «احذف السطر»، «أعِد صياغة `build.gradle.kts` كاملة كرقعة»، «استخرج نسخة
 الـ workflow بفلتر فرعك وبلا `contents: write`»، أو «أجب الوكيل 1/2 على نقطة كذا».
+
+
+---
+
+# أ7. ما أُضيف اليوم لأجل «تطبيق الفلتر» — ولا أُريد منك إلا سطراً واحداً
+
+بتوجيه المستخدم («أضف أدوات بناء وكل الإضافات مفتوحة المصدر التي يستخدمها الوكيل لبناء وتجربة تطبيق
+فلتر») أُضيفت طبقة أدوات كاملة في مساحة أملكها. **لم أغيّر `apps/marketer` ولا `apps/orders-delivery`
+ولا `.github/`**، ولا شغّلت CI.
+
+| المضاف | ما هو | حالته (بما تحققت فعلاً) |
+|---|---|---|
+| `tools/tools.lock` | 33 بنداً: 9 أدوات · 17 اعتمادية · 3 خطوات CI · 4 ملاحظات سياسة — مع `license` و`verified` إلزاميين | يُحلَّل بـ `RawConfigParser` في الاختبار؛ الفرض: `g:a:v` لكل `gradle-dep` |
+| `tools/install-toolchain.sh` | `--list` · `--check` · `--install` · `--emit-deps` · `--emit-ci` · `--emit-env` · `--verify` | `--install ktlint,shellcheck --dry-run` أعاد روابط أصول حقيقية من GitHub Releases (1.8.0 / v0.11.0، بصيغ linux.x86_64) |
+| `tools/install-gradle-wrapper.sh` + `tools/vendor/gradle-wrapper/8.7.0/` | wrapper رسمي (jar **43٬453 بايت** + `gradlew` + `gradlew.bat` + `manifest.json` بالـ sha256) | **يغلق A3 بلا خدمات Gradle**: جُلب من وسم `gradle/gradle@v8.7.0` عبر `api.github.com`؛ `--verify` ✓؛ والـ jar يفحص كـ ZIP ويحوي `GradleWrapperMain` |
+| `tools/filter-app-template/` | 38 ملفاً: 14 Kotlin · 7 شيدرات AGSL · 3 ملفات اختبار (16 `@Test`) · Gradle/res/مانيفست | قالب بلا Hilt وبلا kapt وبلا Room ⇒ فئة فشل `42274698251` (خيار kapt) غير ممكنة فيه |
+| `tools/scaffold-filter-app.sh` | `--into` · `--package` · `--label` · `--wrapper` · `--verify` · `--dry-run` · `--print-manifest` · يرفض الكتابة فوق موجود بـ `--replace` فقط | وُلِّد منه `apps/filter/` (43 ملفاً) وانطلق الـ wrapper عبره؛ الفحص 14/14 ✓ |
+| `tools/verify-filter-app.sh` | 14 فحصاً بنيوياً بلا Gradle/SDK + `--gate` + `--list-checks` | أصحح مرتين **من فحوصه**: اكتشاف بالاسم بدل افتراض مسار الحزمة، وعدّ صحيح لسطور `dependencies` |
+| `tools/tests/toolchain-smoke.sh` | 43 فحصاً، **منها 5 سلبية**: شيدر مفقود · نص محذوف · `jvmargs` غائب · XML مكسور · `RuntimeShader` بلا شرط SDK | 43/43 ✓، وموصول داخل `scripts/tests/mock-smoke.sh` ⇒ يعمل في CI بخطوة `Self-test` الحالية؛ الإجمالي **90/90** |
+| `FILTER_APP_TOOLCHAIN.md` · `tools/README.md` | قرار البنية (AGSL لا GPUImage/OpenCV/ffmpeg-kit) والاستخدام | موثَّقان مع «ما لم أتحقق منه» صراحة |
+
+### لماذا AGSL بدل مكتبة فلاتر؟ (ملخّص الجدول الكامل في الوثيقة)
+
+`android.graphics.RuntimeShader` من API 33 ⇒ سبعة فلاتر (رمادي، سيبيا، تباين، تعتيم حواف، بكسلة، تمويه،
+بلا تغيير) بـ **صفر بايت** إضافية وصفر `.so` وصفر التزام ترخيصي. استُبعدت `android-gpuimage` (متوقفة
+2022 + ترخيص غير محسوم + NDK)، وOpenCV (10MB لميزان لون)، و`MagicCamera` (بلا ترخيص)، و`ffmpeg-kit`
+(**archived**) — وكلها مسجَّلة في `tools.lock` كبنود `note` مع السبب، فلا تُعاد المناقشة من الصفر.
+
+### السطر الوحيد المطلوب منك (أنت صاحب `.github/`)
+
+```diff
+       matrix:
+-        app: [marketer, orders-delivery]
++        app: [marketer, orders-delivery, filter]
+```
+
+لا شيء آخر: `build-apk.sh` يكتشف `apps/filter` بذاته، والاختبارات الجديدة تُشغَّل تلقائياً داخل
+`Self-test`. واختيارياً لإغلاق A3 على الجميع: `./tools/install-gradle-wrapper.sh --apps`.
+
+### قراران لم أحسمهما (وهما لك/للكود، لا لي)
+
+1. **إحداثيات غير موثَّقة**: CameraX `1.3.4` وRoborazzi/Robolectric/Paparazzi/LeakCanary في القفل بحالة
+   `needs-online` لأن `maven.google.com` محجوب هنا، والقالب يستخدم CameraX. إن فشل
+   `debugCompileClasspath` فابدأ التحقق من هذه السطور (`./tools/install-toolchain.sh --emit-deps camera`)
+   **قبل** اتهام كود الوكيل 1 — هذه هي نفس طبقة خطأ `42273932002`.
+2. **API 24–32**: مسار GLES غير مكتوب؛ القالب يعرض الصورة بلا فلتر ولا ينهار (مُغطًّى بـ
+   `FilterCapabilityTest`). إمّا تقبله في النسخة الأولى أو تطلب من الوكيل 1 المسار الثاني قبل الدمج.
+
+**ولم أنفّذ ما يبقى في ر6** (حذف `arg("room.generateKotlin","true")` من التطبيقين) لأنه يمسّ `apps/`؛
+هو سطر واحد إن أردته مني في كوميت مستقل.

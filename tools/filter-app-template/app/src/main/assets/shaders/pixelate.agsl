@@ -1,0 +1,10 @@
+// بكسلة بتكميم الإحداثيات (block = حجم الكتلة بالبكسل)
+uniform shader content;
+uniform float block;
+uniform float2 resolution;
+
+half4 main(float2 coord) {
+    float b = max(1.0, floor(block));
+    float2 cell = floor(coord / b) * b + b * 0.5;
+    return content.eval(clamp(cell, float2(0.0), resolution));
+}

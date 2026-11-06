@@ -1,0 +1,13 @@
+// تعتيم حواف ناعم؛ radius يتحكم في بداية التلاشي
+uniform shader content;
+uniform float radius;
+uniform float2 resolution;
+
+half4 main(float2 coord) {
+    half4 src = content.eval(coord);
+    float2 p = (coord / resolution - 0.5) * 2.0;
+    float d = length(p);
+    float start = mix(0.4, 0.95, clamp(radius, 0.0, 1.0));
+    float v = smoothstep(start, 1.25, d);
+    return half4(src.rgb * (1.0 - v * 0.85), src.a);
+}

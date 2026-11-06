@@ -638,7 +638,7 @@ arg("room.schemaLocation", …) } }` في أي `build.gradle.kts`، ولا مج�
 
 `android-sdk-setup.sh` (سطر 83 + تعليقان)، `sign-apk.sh` (env + غير تفاعلي + بصمة + zipalign)،
 `download-gradlew.sh` (نسخة من الوسيط + اكتشاف المشاريع + 8.7)، `check-env.sh` (فحص Java رقمياً +
-Wrapper لكل مشروع + `echo -e`). `bash -n` نظيف على `scripts/*.sh` كلها و`mock-smoke.sh` 89/89 —
+Wrapper لكل مشروع + `echo -e`). `bash -n` نظيف على `scripts/*.sh` كلها و`mock-smoke.sh` 90/90 —
 **لا تُرجع أيّاً منها بحجة الأفضلية الأسلوبية**؛ كل تغيير له سطر تبرير في `TROUBLESHOOTING.md` §9
 و`scripts/README.md` §3–5. لو أردت إعادة هيكلة (مثلاً نقل اكتشاف المشاريع إلى دالة مشتركة
 `lib/apps.sh`) فافعلها في patch منفصل بعد دمج 0 لفرعي، حتى لا نفقد ما يختبره CI.

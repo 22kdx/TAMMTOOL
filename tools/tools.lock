@@ -1,0 +1,327 @@
+# TAMMTOOL · أدوات وبناء وتطبيق الفلتر — ملف القفل الوحيد (single source of truth)
+# كل بند: [kind:name] ثم مفاتيح. تُقرأ بـ tools/install-toolchain.sh (لا تحرّر سكربتات للتغيير هنا).
+#
+#   kind = tool        أداة سطر أوامر تُنزَّل وتُشغَّل محلياً
+#        = gradle-dep  اعتمادية Gradle/Maven تضاف إلى build.gradle.kts
+#        = ci-action   خطوة GitHub Actions
+#        = note        قرار/تحذير سياسة (لا يُنزَّل شيء)
+#
+#   verified = github-api@<date>   ⟵ تحققتُ من الريبو/النسخة/الترخيص عبر api.github.com في هذا التاريخ
+#            = repo-fact           ⟵ مأخوذ من ملفات المستودع الحالية (AGP/Kotlin/Compose)
+#            = needs-online        ⟵ الإحداثية لم أتحقق منها (maven.google.com محجوب هنا) — افحصها قبل الاعتماد
+#
+#   ⚠ كل رقم نسخة أدناه موجود فعلاً كـ tag/release في الريبو وقت الكتابة؛ هذا لا يعني أنه
+#     أحدث نسخة اليوم، ولا أن الإحداثية منشورة في المستودع الذي تستخدمه.
+
+# ─────────────────────────── سلسلة البناء (build chain) ───────────────────────────
+[tool:gradle-wrapper]
+kind = tool
+repo = gradle/gradle
+tag = v8.7.0
+asset = n/a
+install = scripts
+bin = gradlew
+license = Apache-2.0
+verified = github-api@2026-11-06
+purpose = يزرّع gradle-wrapper.jar من tools/vendor/ (لا حاجة لخدمات Gradle) — يغلق A3
+notes = ./tools/install-gradle-wrapper.sh --apps
+group = build
+
+[tool:jdk17]
+kind = tool
+repo = adoptium/temurin17-binaries
+tag = latest
+asset = OpenJDK17U-jdk_{os}_{arch}_hotspot_*.tar.gz
+extract = tar
+bin = bin/java
+license = GPL-2.0-with-classpath-exception
+verified = github-api@2026-11-06
+purpose = JDK 17 إلزامي لـ AGP 8.x (فرع الوكيل 0 يستخدم 1.9.20/AGP 8.2 لكن البناء نفسه يتطلب 17)
+group = build
+
+[tool:android-sdk]
+kind = tool
+repo = n/a
+tag = n/a
+asset = commandlinetools-linux-11076708_latest.zip
+bin = cmdline-tools/latest/bin/sdkmanager
+license = non-OSS (Google, free to use)
+verified = repo-fact
+purpose = platform-tools + platforms;android-35 + build-tools;35.0.0
+notes = موجود أصلاً: ./scripts/android-sdk-setup.sh --sdk-dir DIR --accept-licenses
+group = build
+
+# ─────────────────────────── الفحص والتنسيق (quality) ───────────────────────────
+[tool:ktlint]
+kind = tool
+repo = pinterest/ktlint
+tag = 1.8.0
+asset = ktlint
+extract = copy
+bin = ktlint
+license = MIT
+verified = github-api@2026-11-06
+purpose = تنسيق/فحص Kotlin — يُصلح آلياً معظم ملاحظات الـ review
+usage = ktlint --format "apps/filter/**/*.kt" ; الفحص الصارم: ktlint --relative "apps/**/*.kt"
+group = quality
+
+[tool:detekt]
+kind = tool
+repo = detekt/detekt
+tag = v1.23.8
+asset = detekt-cli-{ver}-all.jar
+extract = jar
+bin = detekt-cli
+license = Apache-2.0
+verified = github-api@2026-11-06
+purpose = قواعد تعقيد/روائح في Kotlin بلا إعداد مطلوب
+usage = java -jar detekt-cli-all.jar --input apps/filter --report txt
+group = quality
+
+[tool:shellcheck]
+kind = tool
+repo = koalaman/shellcheck
+tag = v0.11.0
+asset = shellcheck-v{ver}.{os}.{arch2}.tar.xz
+extract = tar
+bin = bin/shellcheck
+license = GPL-3.0
+verified = github-api@2026-11-06
+purpose = فحص سكربتات tools/ و scripts/ (الأداة التي كان ينقصنا في هذه البيئة)
+usage = shellcheck -S warning tools/*.sh scripts/*.sh
+group = quality
+
+# ─────────────────────────── فحص الـ APK الناتج (artifacts) ───────────────────────────
+[tool:apktool]
+kind = tool
+repo = iBotPeaches/Apktool
+tag = v3.0.3
+asset = apktool_{ver}.jar
+extract = jar
+bin = apktool
+license = Apache-2.0
+verified = github-api@2026-11-06
+purpose = فكّ APK للتحقق من المانيفست/الموارد/الحزمة بعد البناء (بديل لا يحتاج Android SDK)
+usage = java -jar apktool.jar d -s app-debug.apk -o out && grep -n "uses-permission" out/AndroidManifest.xml
+group = apk-analysis
+
+[tool:jadx]
+kind = tool
+repo = skylot/jadx
+tag = v1.5.6
+asset = jadx-{ver}.zip
+extract = zip
+bin = bin/jadx
+license = Apache-2.0
+verified = github-api@2026-11-06
+purpose = استخراج الكود المصغَّر للتأكد أن R8 لم يمسح ما يجب بقاؤه (وللتحقيق في انهيار)
+usage = jadx -d out dist/filter-debug-*.apk && grep -rn "onResume\|RuntimeShader" out/sources | head
+group = apk-analysis
+
+[tool:scrcpy]
+kind = tool
+repo = Genymobile/scrcpy
+tag = v5.0.1
+asset = scrcpy-{os}-{arch2}-{ver}.tar.gz
+extract = tar
+bin = bin/scrcpy
+license = Apache-2.0
+verified = github-api@2026-11-06
+purpose = عكس شاشة الهاتف + تسجيل فيديو للجلسة: «تجربة» التطبيق على جهاز حقيقي تُرى وتُقارَن
+usage = scrcpy --record filter-demo.mp4 --time-limit 60 ; مع الاختبار: ./scripts/apk-test.sh test --app filter
+group = device
+
+# ──────────────────────── مكتبات تطبيق الفلتر (app libraries) ────────────────────────
+[gradle-dep:camera-core]
+kind = gradle-dep
+coordinate = androidx.camera:camera-core:1.3.4
+license = Apache-2.0
+verified = needs-online
+purpose = CameraX: معاينة + التقاط + ImageAnalysis (المدخل الطبيعي للفلاتر الحية)
+group = camera
+
+[gradle-dep:camera-camera2]
+kind = gradle-dep
+coordinate = androidx.camera:camera-camera2:1.3.4
+license = Apache-2.0
+verified = needs-online
+purpose = تنفيذ Camera2 لـ CameraX
+group = camera
+
+[gradle-dep:camera-lifecycle]
+kind = gradle-dep
+coordinate = androidx.camera:camera-lifecycle:1.3.4
+license = Apache-2.0
+verified = needs-online
+purpose = ربط دورة الحياة (bindToLifecycle) بلا تسريب كاميرا
+group = camera
+
+[gradle-dep:camera-view]
+kind = gradle-dep
+coordinate = androidx.camera:camera-view:1.3.4
+license = Apache-2.0
+verified = needs-online
+purpose = PreviewView (يوفر Surface جاهز للرسم عليه)
+group = camera
+
+[gradle-dep:camera-effects]
+kind = gradle-dep
+coordinate = androidx.camera:camera-effects:1.0.0-alpha06
+license = Apache-2.0
+verified = needs-online
+purpose = فلاتر جاهزة مدعومة من Jetpack (pixelate/crop/segmentation) — اختيارية، نسخة تجريبية
+group = camera
+
+[gradle-dep:compose-ui]
+kind = gradle-dep
+coordinate = androidx.compose.ui:ui:1.6.4
+license = Apache-2.0
+verified = repo-fact
+purpose = نفس إصدار التطبيقين الحاليين (لا تُدخل إصداراً جديداً لمصفوفة غير مختبَرة)
+group = compose
+
+[gradle-dep:activity-compose]
+kind = gradle-dep
+coordinate = androidx.activity:activity-compose:1.8.2
+license = Apache-2.0
+verified = repo-fact
+purpose = الجسر بين Activity و Compose
+group = compose
+
+[gradle-dep:lifecycle-viewmodel-compose]
+kind = gradle-dep
+coordinate = androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0
+license = Apache-2.0
+verified = repo-fact
+purpose = ViewModels للشاشات
+group = compose
+
+[gradle-dep:hilt]
+kind = gradle-dep
+coordinate = com.google.dagger:hilt-android:2.50
+license = Apache-2.0
+verified = repo-fact
+purpose = DI بنفس إصدار التطبيقين (اختياري في الفلتر: لا قواعد بيانات بعد)
+group = di
+
+[gradle-dep:coil]
+kind = gradle-dep
+coordinate = io.coil-kt:coil-compose:2.5.0
+license = Apache-2.0
+verified = repo-fact
+purpose = تحميل الصور من الملفات في معرض الصور المصغّرة (repo-fact: معلَنة أصلاً في التطبيقين)
+group = images
+
+[gradle-dep:timber]
+kind = gradle-dep
+coordinate = com.jakewharton.timber:timber:5.0.1
+license = Apache-2.0
+verified = repo-fact
+purpose = سجل موحّد (استعمله فعلاً بدل الإعلان فقط — راجع C7 في GAP_TO_APK.md)
+group = logging
+
+[gradle-dep:junit]
+kind = gradle-dep
+coordinate = junit:junit:4.13.2
+license = EPL-1.0
+verified = repo-fact
+purpose = اختبارات الوحدة على JVM (تعمل في CI بلا محاكي)
+group = tests
+
+[gradle-dep:coroutines-test]
+kind = gradle-dep
+coordinate = org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3
+license = Apache-2.0
+verified = repo-fact
+purpose = اختبار Flow/suspend (نفس نسخة التطبيقين)
+group = tests
+
+[gradle-dep:roborazzi]
+kind = gradle-dep
+coordinate = io.github.takahirom.roborazzi:roborazzi-junit-rule:1.33.0
+license = Apache-2.0
+verified = needs-online
+purpose = **اختبار لقطات الشاشة على JVM** (بلا محاكي): يلتقط Compose ويقارَن بالمرجع — الأهم لتطبيق فلتر
+notes = repo takahirom/roborazzi @ 1.77.0 هو أحدث إصدار وقت الكتابة؛ ارفَع القفل إليه بعد التحقق
+usage = ./gradlew :app:recordRoborazziDebug ثم :app:verifyRoborazziDebug
+group = tests,screenshots
+
+[gradle-dep:robolectric]
+kind = gradle-dep
+coordinate = org.robolectric:robolectric:4.11.1
+license = MIT
+verified = needs-online
+purpose = تشغيل أكواد Android-framework على JVM (يلزمها Roborazzi)
+group = tests,screenshots
+
+[gradle-dep:paparazzi]
+kind = gradle-dep
+coordinate = app.cash.paparazzi:paparazzi-gradle-plugin:1.3.2
+license = Apache-2.0
+verified = needs-online
+purpose = بديل لقطات أسرع بلا Robolectric — اختر واحداً (Paparazzi أو Roborazzi) لا الاثنين
+notes = repo cashapp/paparazzi نشط (آخر دفعة 2026-11-06)
+group = tests,screenshots
+
+[gradle-dep:leakcanary]
+kind = gradle-dep
+coordinate = com.squareup.leakcanary:leakcanary-android:2.14
+license = Apache-2.0
+verified = needs-online
+purpose = تسريب الذاكرة مشكلة تطبيق الكاميرا الأولى (Bitmap/surfaces) — debugImplementation فقط
+group = debug
+
+# ─────────────── فلاتر بديلة جاهزة (استُبعدت — والسبب موثّق) ───────────────
+[note:gpuimage]
+kind = note
+license = غير محدد في الريبو (upstream BSD) — تحقق قبل الشحن
+verified = github-api@2026-11-06
+purpose = wasabeef/android-gpuimage (9153★) و wysaid/android-gpuimage-plus (MIT، نشط 2026-07)
+notes = **لم نُضِفها**: NDK/native .so + تراخيص غير محسومة + آخر دفعة 2022 للأشهر. AGSL في Android
+  نفسه (API 33+) يعطي نفس الفلاتر بلا اعتماديات ولا ملفات ثنائية ⇒ الانحياز للـ platform.
+
+[note:magiccamera]
+kind = note
+license = غير محدد
+verified = github-api@2026-11-06
+purpose = wuhaoyu1990/MagicCamera (5514★) — كاميرا+fلاتر GLSL كاملة
+notes = متوقفة منذ 2020 وبلا ترخيص ⇒ مرجع تعليمي لقراءة الكود، لا اعتمادية في البناء.
+
+[note:ffmpeg-kit]
+kind = note
+license = LGPL-3.0 (ومشروط بتراخيص codecs)
+verified = github-api@2026-11-06
+purpose = arthenica/ffmpeg-kit — فلاتر فيديو/صوت
+notes = **archived = true** (آخر دفعة 2026-07-02): لا تعتمده في مشروع جديد. إن لزم الفيديو:
+  fork مجتمع (microg/ffmpeg-kit) أو Media3 Transformer (Apache-2.0، رسمي، يدعم effects).
+
+[note:mlkit-segmentation]
+kind = note
+license = غير مفتوح المصدر (Google Play Services)
+verified = needs-online
+purpose = عزل الشخص عن الخلفية (فلاتر الواقع المعزّز)
+notes = مفتوحة المصدر ≠ شرط، لكن نموذجها يُنزَّل ديناميكياً ⇒ لا يعمل بلا Play Services؛ إن أردته
+  فاجعله ميزة اختيارية (feature toggle) لا مساراً أساسياً في التطبيق.
+
+# ─────────────────────────── CI ───────────────────────────
+[ci-action:setup-java]
+kind = ci-action
+license = Apache-2.0
+coordinate = actions/setup-java@v4
+verified = repo-fact
+purpose = JDK 17 على الـ runner (v5 موجودة — migrate عند أول فرصة: تحذير deprecation ظهر في CI)
+
+[ci-action:setup-gradle]
+kind = ci-action
+license = Apache-2.0
+coordinate = gradle/actions/setup-gradle@v4
+verified = repo-fact
+purpose = Gradle 8.7 + تخزين مؤقت للتبعيات (يبني بلا wrapper إن ضبطت TAMM_GRADLE_BIN)
+
+[ci-action:emulator-runner]
+kind = ci-action
+license = Apache-2.0
+coordinate = ReactiveCircus/android-emulator-runner@v2
+verified = github-api@2026-11-06
+purpose = محاكي + androidTest في CI (1315★، Apache-2.0) — مكلف (~10–20 دقيقة) وهو الطريق الوحيد لاختبارات instrumented
+notes = أضِفه كوظيفة منفصلة عن build حتى لا يتأخر كل push

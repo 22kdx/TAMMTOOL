@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">TAMM Filter</string>
+    <string name="filter_none">Original</string>
+    <string name="capture">Capture</string>
+    <string name="intensity">Intensity</string>
+    <string name="permission_needed">Camera permission is required to preview and capture.</string>
+    <string name="grant">Grant</string>
+    <string name="filter_grayscale">Grayscale</string>
+    <string name="filter_sepia">Sepia</string>
+    <string name="filter_contrast">Contrast</string>
+    <string name="filter_vignette">Vignette</string>
+    <string name="filter_pixelate">Pixelate</string>
+    <string name="filter_blur">Blur</string>
+</resources>

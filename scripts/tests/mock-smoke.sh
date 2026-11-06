@@ -443,6 +443,14 @@ cp "$BIN/adb" /dev/null 2>/dev/null || true
 rm -f "$BIN/aapt2" "$BIN/aapt"
 expect "info بدون aapt يستخدم التحليل الاحتياطي" bash "$T" info "$WORK/demo.apk"
 
+say "أدوات tools/ (سلسلة تطبيق الفلتر + القفل + الـ wrapper)"
+if [[ -f "$REPO_ROOT/tools/tests/toolchain-smoke.sh" ]]; then
+  # سلسلتها تُشغَّل كما هي ونتيجةُها فحصٌ واحد هنا: إن فشلت تعطب هذه الخطوة كلها
+  expect "tools/: 43 فحصاً في toolchain-smoke.sh" bash "$REPO_ROOT/tools/tests/toolchain-smoke.sh"
+else
+  no "tools/tests/toolchain-smoke.sh مفقود — أُدرج في mock-smoke ولا يوجد الملف"
+fi
+
 echo
 if [[ $FAILED -eq 0 ]]; then
   printf '\033[0;32m✓\033[0m  كل الفحوص نجحت (%s)\n' "$PASSED"

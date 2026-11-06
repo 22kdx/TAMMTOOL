@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- ثلاث عدسات فلاتر — رمز بصري بسيط بلا أصل خارجي -->
+    <path android:fillColor="#F2B705" android:pathData="M36,54m-14,0a14,14 0,1 1,28 0a14,14 0,1 1,-28 0" />
+    <path android:fillColor="#12B5A5" android:pathData="M60,44m-14,0a14,14 0,1 1,28 0a14,14 0,1 1,-28 0" />
+    <path android:fillColor="#E8556D" android:pathData="M62,66m-14,0a14,14 0,1 1,28 0a14,14 0,1 1,-28 0" />
+</vector>

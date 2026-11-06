@@ -1,0 +1,22 @@
+// غاوس 9-tap أحادي المحمل بتقريب قابل للالتقاط (linear sampling يدمج الجارين)
+// الأوزان أدناه معيارية (مجموعها = 1.0) ⇒ لا قسمة إضافية بعد الجمع.
+uniform shader content;
+uniform float sigma;
+uniform float2 resolution;
+
+half4 sampleBlur(float2 coord, float2 dir, float s) {
+    float2 px = (s / max(dir, float2(1e-4))) * dir;
+    half4 sum = content.eval(coord) * 0.227027;
+    sum += (content.eval(coord + px * 1.3846) + content.eval(coord - px * 1.3846)) * 0.316216;
+    sum += (content.eval(coord + px * 3.2308) + content.eval(coord - px * 3.2308)) * 0.070270;
+    return sum;
+}
+
+half4 main(float2 coord) {
+    half4 src = content.eval(coord);
+    float s = clamp(sigma, 0.0, 12.0);
+    half4 h = sampleBlur(coord, float2(1.0, 0.0), s);
+    half4 v = sampleBlur(coord, float2(0.0, 1.0), s);
+    half3 avg = (h.rgb + v.rgb) * 0.5;
+    return half4(avg, src.a);
+}

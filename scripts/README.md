@@ -32,6 +32,10 @@ scripts/
 
 ---
 
+> **أدوات «تطبيق الفلتر» وسلسلة الإصدارات المقفلة ليست هنا بل في [`../tools/README.md`](../tools/README.md)**
+> (`tools.lock` · `install-toolchain.sh` · `install-gradle-wrapper.sh` · `scaffold-filter-app.sh` ·
+> `verify-filter-app.sh`). سكربتات هذا الدليل تبنى وتختبر أي تطبيق، بما فيه `filter`.
+
 ## 1. `build-apk.sh` — البناء المحلي (الإصدار 2.1)
 
 ```bash
@@ -257,7 +261,7 @@ KEYSTORE_PASSWORD='…' KEY_PASSWORD='…' \
 ## 6. `tests/mock-smoke.sh` — هل السكربتات نفسها سليمة؟
 
 ```bash
-./scripts/tests/mock-smoke.sh        # 89 فحصاً
+./scripts/tests/mock-smoke.sh        # 90 فحصاً (آخرها يشغّل tools/tests/toolchain-smoke.sh: 43 فحصاً لأدوات tools/)
 ./scripts/tests/mock-smoke.sh -v     # مع مخرجات الحالات الفاشلة
 ```
 

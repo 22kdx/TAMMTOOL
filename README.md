@@ -32,6 +32,8 @@ git clone https://github.com/22kdx/TAMMTOOL.git && cd TAMMTOOL
 | [`BUILD_GUIDE.md`](BUILD_GUIDE.md) | خطوة بخطوة: تجهيز الجهاز، التثبيت على كل نظام، البناء، التوقيع، الاختبار، CI |
 | [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | رسالة الخطأ ← السبب ← الحل (بما فيها حالة CI الحالية بالأدلة) |
 | [`scripts/README.md`](scripts/README.md) | مرجع أوامر كل سكربتات `scripts/` وخياراتها (منها `ci-logs.sh` لقراءة CI) |
+| [`FILTER_APP_TOOLCHAIN.md`](FILTER_APP_TOOLCHAIN.md) | **تطبيق الفلتر**: لماذا AGSL لا مكتبات فلاتر، وقفل الأدوات والاعتماديات بتراخيصها، وحدود ما تحققت منه |
+| [`tools/README.md`](tools/README.md) | أدوات `tools/`: ملف القفل، توليد المشروع، الـ wrapper المخزّن، الفحص البنيوي (14 فحصاً) واختبار الأدوات (43) |
 | [`GAP_TO_APK.md`](GAP_TO_APK.md) | **ما الذي ينقص لإنتاج التطبيق؟** — 16 فجوة بالأولوية مع أمر يثبتها وسطر يصلحها · **§7: جدول الحالة بعد التنفيذ (12/16 مُطبَّقة في `arena/68a3e358`)** |
 | [`PLAY_STORE_RELEASE.md`](PLAY_STORE_RELEASE.md) | keystore، توقيع AAB/APK، R8/mapping، قائمة Play، وقوائم تحقق النشر |
 | [`patches/README.md`](patches/README.md) | رقع `git am` جاهزة (CI الصادق · ذاكرة Gradle · مخطط Room) + سجل التحقق |
@@ -47,7 +49,7 @@ git clone https://github.com/22kdx/TAMMTOOL.git && cd TAMMTOOL
 نفسها بلا Android). المرجع الكامل: [`scripts/README.md`](scripts/README.md).
 
 ```bash
-./scripts/tests/mock-smoke.sh      # 89 فحصاً بمحاكاة java/gradle/adb/aapt2 — بلا إنترنت ولا JDK
+./scripts/tests/mock-smoke.sh      # 90 فحصاً بمحاكاة java/gradle/adb/aapt2 — بلا إنترنت ولا JDK
 ```
 
 ## حالة CI

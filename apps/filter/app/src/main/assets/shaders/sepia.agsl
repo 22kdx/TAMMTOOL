@@ -1,0 +1,15 @@
+// سيبيا كلاسيكية بمصفوفة 3x3 + مزج بالشدة
+uniform shader content;
+uniform float amount;
+
+half4 main(float2 coord) {
+    half4 src = content.eval(coord);
+    half3 r = src.rgb;
+    half3 sepia = half3(
+        dot(r, half3(0.393, 0.769, 0.189)),
+        dot(r, half3(0.349, 0.686, 0.168)),
+        dot(r, half3(0.272, 0.534, 0.131))
+    );
+    float a = clamp(amount, 0.0, 1.0);
+    return half4(mix(r, sepia, a), src.a);
+}

@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">تمّ فلتر</string>
+    <string name="filter_none">بدون فلتر</string>
+    <string name="capture">التقاط</string>
+    <string name="intensity">الشدة</string>
+    <string name="permission_needed">إذن الكاميرا مطلوب للمعاينة والالتقاط.</string>
+    <string name="grant">منح الإذن</string>
+    <string name="filter_grayscale">رمادي</string>
+    <string name="filter_sepia">سيبيا</string>
+    <string name="filter_contrast">تباين</string>
+    <string name="filter_vignette">تعتيم الحواف</string>
+    <string name="filter_pixelate">بكسلة</string>
+    <string name="filter_blur">تمويه</string>
+</resources>

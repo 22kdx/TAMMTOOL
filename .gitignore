@@ -150,3 +150,8 @@ android-sdk/
 /fastlane/Preview.html
 /fastlane/screenshots
 /fastlane/test_output
+
+# أدوات tools/ — مخازن التنزيل المحلية لا تُرفع (القفل والملفات المنزَّلة)
+/tools/.cache/
+/tools/toolchain/
+/apps/*/app/build-filters/

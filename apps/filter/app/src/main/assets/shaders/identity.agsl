@@ -1,0 +1,5 @@
+// لا تغيير: يمرر الصورة كما هي (مرجع للاختبار البصري)
+uniform shader content;
+half4 main(float2 coord) {
+    return content.eval(coord);
+}

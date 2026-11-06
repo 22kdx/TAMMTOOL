@@ -1,0 +1,11 @@
+// رمادي-weighted (Rec.709) — الشدة تخلط بين الأصلي والمُحوَّل
+uniform shader content;
+uniform float luma;
+
+float lum(half3 c) { return dot(c, half3(0.2126, 0.7152, 0.0722)); }
+
+half4 main(float2 coord) {
+    half4 src = content.eval(coord);
+    float g = dot(src.rgb, half3(0.2126, 0.7152, 0.0722));
+    return half4(mix(src.rgb, half3(g), clamp(luma, 0.0, 1.0)), src.a);
+}

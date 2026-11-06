@@ -441,7 +441,7 @@ git add -f apps/*/gradlew apps/*/gradle/wrapper/gradle-wrapper.jar apps/*/gradle
 **للاطمئنان إلى السكربتات نفسها** (بلا Android، بلا هاتف، بلا إنترنت):
 
 ```bash
-./scripts/tests/mock-smoke.sh        # 89 فحصاً بمحاكاة java/gradle/adb/aapt2
+./scripts/tests/mock-smoke.sh        # 90 فحصاً بمحاكاة java/gradle/adb/aapt2
 ./scripts/apk-test.sh selftest       # فحص صيغة وسلاسة أوامر
 ```
 

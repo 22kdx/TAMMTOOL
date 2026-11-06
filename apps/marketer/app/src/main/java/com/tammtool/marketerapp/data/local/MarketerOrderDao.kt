@@ -31,7 +31,7 @@ interface MarketerOrderDao {
     fun getByCustomerPhone(phone: String): Flow<List<MarketerOrder>>
 
     @Query("""
-        UPDATE marketer_orders 
+        UPDATE marketer_orders
         SET status = :status, updated_at = :updatedAt
         WHERE id = :id
     """)

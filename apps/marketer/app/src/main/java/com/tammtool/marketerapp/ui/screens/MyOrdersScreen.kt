@@ -85,7 +85,7 @@ private fun OrderCard(order: MarketerOrder, onClick: () -> Unit) {
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                 )
-                SuggestionChip(onClick = {}, 
+                SuggestionChip(onClick = {},
                     label = { Text(order.status.name) },
                     colors = SuggestionChipDefaults.suggestionChipColors(
                         containerColor = statusColor(order.status).copy(alpha = 0.2f)

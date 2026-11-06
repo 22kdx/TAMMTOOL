@@ -99,7 +99,7 @@ private fun CommissionCard(commission: MarketerCommission) {
                 Text(text = "${commission.amount} ريال", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.W500))
             }
             Spacer(modifier = Modifier.weight(1f))
-            SuggestionChip(onClick = {}, 
+            SuggestionChip(onClick = {},
                 label = { Text(commission.status.name) },
                 colors = SuggestionChipDefaults.suggestionChipColors(
                     containerColor = when (commission.status) {

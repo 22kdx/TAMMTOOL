@@ -62,6 +62,30 @@ jobs:
           flutter config --enable-android
           flutter config --android-sdk $HOME/android-sdk
           echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+
+      - name: Verify Android SDK tools
+        run: |
+          echo "=== Java version ==="
+          java -version 2>&1 || true
+          echo ""
+          echo "=== ANDROID_HOME ==="
+          echo "$ANDROID_HOME"
+          echo ""
+          echo "=== SDK directory listing ==="
+          ls -la $HOME/android-sdk/ || true
+          echo ""
+          echo "=== Platform tools ==="
+          ls -la $HOME/android-sdk/platform-tools/ 2>/dev/null || echo "No platform-tools"
+          $HOME/android-sdk/platform-tools/adb version 2>/dev/null || echo "adb not found"
+          echo ""
+          echo "=== Build tools ==="
+          ls -la $HOME/android-sdk/build-tools/ 2>/dev/null || echo "No build-tools"
+          $HOME/android-sdk/build-tools/35.0.0/aapt version 2>/dev/null || echo "aapt not found"
+          echo ""
+          echo "=== Platforms ==="
+          ls -la $HOME/android-sdk/platforms/ 2>/dev/null || echo "No platforms"
+          echo ""
+          echo "=== Flutter doctor ==="
           flutter doctor -v
 
       - name: Create local.properties for Flutter Android

@@ -3,9 +3,9 @@
 # download-gradlew.sh - تحميل ملفات Gradle Wrapper مباشرة
 # جزء من مستودع TAMMTOOL
 #
-# هذا السكريبت يقوم بتحميل ملفات Gradle Wrapper (gradlew, gradlew.bat,
-# gradle-wrapper.jar, gradle-wrapper.properties) من خوادم Gradle الرسمية
-# دون الحاجة إلى تثبيت أداة gradle على النظام.
+# يقوم بتحميل توزيع Gradle الكامل، استخراج ملفات الـ Wrapper (gradle-wrapper.jar,
+# gradle-wrapper.properties)، وإنشاء سكريبت gradlew دون الحاجة إلى تثبيت
+# أداة gradle على النظام.
 #
 # الاستخدام:
 #   ./scripts/download-gradlew.sh [النسخة]
@@ -43,11 +43,32 @@ download_wrapper() {
   log_info "تحميل Gradle Wrapper الإصدار $GRADLE_VERSION لـ: $app_dir"
   mkdir -p "$wrapper_dir"
 
-  # تحميل gradle-wrapper.jar
-  log_info "جاري تحميل gradle-wrapper.jar..."
+  # تحميل توزيع Gradle الكامل
+  local gradle_zip="$PROJECT_ROOT/.gradle-${GRADLE_VERSION}-bin.zip"
+  local gradle_dist_url="https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+
+  log_info "جاري تحميل توزيع Gradle ${GRADLE_VERSION}..."
   curl -L --fail --retry 3 --retry-delay 5 \
-    -o "$wrapper_dir/gradle-wrapper.jar" \
-    "https://repo.gradle.org/gradle/libs-gradle-wrapper/dist/gradle-wrapper.jar"
+    -o "$gradle_zip" \
+    "$gradle_dist_url"
+
+  # استخراج gradle-wrapper.jar من التوزيع
+  log_info "استخراج gradle-wrapper.jar..."
+  if command -v unzip &> /dev/null; then
+    unzip -o -j "$gradle_zip" "gradle-${GRADLE_VERSION}/lib/gradle/wrapper/gradle-wrapper.jar" -d "$wrapper_dir" 2>/dev/null || \
+    unzip -o -j "$gradle_zip" "gradle-${GRADLE_VERSION}/lib/plugins/gradle-wrapper.jar" -d "$wrapper_dir" 2>/dev/null || \
+    unzip -l "$gradle_zip" | grep "wrapper/gradle-wrapper.jar" | head -1 | awk '{print $4}' | xargs -I{} unzip -o -j "$gradle_zip" "{}" -d "$wrapper_dir"
+  else
+    log_error "أداة unzip غير مثبتة."
+    rm -f "$gradle_zip"
+    exit 1
+  fi
+
+  if [[ ! -f "$wrapper_dir/gradle-wrapper.jar" ]]; then
+    log_error "فشل العثور على gradle-wrapper.jar داخل التوزيع المحمل."
+    rm -f "$gradle_zip"
+    exit 1
+  fi
 
   # إعداد ملف الخصائص
   log_info "إعداد gradle-wrapper.properties..."
@@ -226,6 +247,9 @@ if "%OS%"=="Windows_NT" endlocal
 BAT_EOF
 
   chmod +x "$app_dir/gradlew"
+
+  # تنظيف ملف zip المؤقت
+  rm -f "$gradle_zip"
 
   log_ok "تم تحميل Gradle Wrapper بنجاح في: $app_dir"
 }

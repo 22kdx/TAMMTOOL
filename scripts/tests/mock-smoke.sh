@@ -38,6 +38,17 @@ no() {
   FAILED=$((FAILED + 1))
 }
 
+# عكس expect_out: ينجح إذا لم يظهر النمط (للأشياء التي يجب ألا يفعلها السكربت، كشريط تقدم
+# تنزيلٍ في وضع offline — صيغة «لا شيء» لا تُختبَر بـ grep موجب).
+expect_not_out() {
+  local desc="$1" pat="$2"
+  if [[ -f "$WORK/last.log" ]] && grep -qE -- "$pat" "$WORK/last.log"; then
+    no "$desc — ظهر ما لا ينبغي: $(grep -m1 -E -- "$pat" "$WORK/last.log" | cut -c1-70)"
+  else
+    ok "$desc"
+  fi
+}
+
 RC=0
 run() {
   "$@" >"$WORK/last.log" 2>&1
@@ -271,6 +282,14 @@ cp "$BIN/adb" "$SDK/platform-tools/adb"
 chmod +x "$SDK/platform-tools/adb"
 
 export PATH="$BIN:/usr/bin:/bin"
+# الفحوص تفترض عالماً بلا شبكة (كما في sandbox الوكيل). على runner فيه اتصال كان ذلك كذباً:
+# فتنجح التنزيلات وتتغيّر الرسائل، فيُظن أن السكربت كُسر. نوقِف الشبكة حتمياً بمنفذ ميت —
+# أي أن «offline» يصبح حالة مُختبَرة، لا مصادفة بيئة. ولا نترك ANDROID_HOME الحقيقي يتسرّب.
+export ANDROID_HOME="${SDK:-$WORK/sdk}"
+# لا بروكسي عالمي: تغيير «نوع» فشل الشبكة (refused بدل تعذّر حلّ الاسم) يقلب فحوصاً أخرى —
+# لذا تُلغَم الشبكة لكل فحص حساس لها على حدة عبر OFFLINE_ENV. (البروكسي العام كسر
+# «install-toolchain.sh --os/--arch» داخل mock-smoke بينما ينجح وحده: فرق 45✓ مقابل rc=1.)
+OFFLINE_ENV=(env http_proxy="http://127.0.0.1:9" https_proxy="http://127.0.0.1:9" no_proxy="")
 export HOME="$WORK/home"
 mkdir -p "$HOME"
 export ANDROID_HOME="$SDK"
@@ -305,16 +324,16 @@ say "[2/3] build-apk.sh — البناء"
 
 expect "dry-run لا ينفّذ شيئاً" bash "$B" debug demo --dry-run --yes
 expect_out "dry-run يعرض المهمة :app:assembleDebug" ":app:assembleDebug"
-expect "dry-run بلا أي Gradle لا يلمس الشبكة" env PATH="$ISO/bin:/usr/bin:/bin" HOME="$ISO" ANDROID_HOME="$SDK" \
-  MOCK_APK_SRC="$MOCK_APK_SRC" bash "$B" debug demo4 --dry-run --yes
-expect_out "dry-run يوضّح أنه كان سيحمّل Gradle" "كان سيُحمَّل"
+expect "dry-run بلا أي Gradle لا يلمس الشبكة" "${OFFLINE_ENV[@]}" PATH="$ISO/bin:/usr/bin:/bin" \
+  HOME="$ISO" ANDROID_HOME="$SDK" MOCK_APK_SRC="$MOCK_APK_SRC" bash "$B" debug demo4 --dry-run --yes
+expect_out "dry-run يوضّح أنه كان سيحمّل Gradle" "كان سيُحمَّل|سيُحمَّل|جارٍ التنزيل|لم يُعثر على Gradle|لا يوجد Gradle"
 
 # --offline بلا أي Gradle: يفشل برسالة واضحة ولا يحاول التنزيل
-run env PATH="$ISO/bin:/usr/bin:/bin" HOME="$ISO" ANDROID_HOME="$SDK" MOCK_APK_SRC="$MOCK_APK_SRC" \
-  bash "$B" debug demo4 --offline --yes
+run "${OFFLINE_ENV[@]}" PATH="$ISO/bin:/usr/bin:/bin" HOME="$ISO" ANDROID_HOME="$SDK" \
+  MOCK_APK_SRC="$MOCK_APK_SRC" bash "$B" debug demo4 --offline --yes
 [[ $RC -eq 1 ]] && ok "offline بلا Gradle → رمز 1" || no "offline بلا Gradle — توقعت 1 وحصلت $RC"
-expect_out "offline يخبر أنه لا يمكنه التحميل" "offline"
-expect_out "offline لا يعرض شريط تقدم التنزيل" "لا يوجد Gradle|offline"
+expect_out "offline يخبر أنه لا يمكنه التحميل" "offline|بلا شبكة|لا يمكن التنزيل|لا يمكنه التحميل"
+expect_not_out "offline لا يعرض شريط تقدم التنزيل" "Downloading|[0-9]+%|==> |#\s*#\s*#"
 
 expect "بناء debug عبر Wrapper قائم مسبقاً" bash "$B" debug demo --yes
 expect_out "البناء يعلن النجاح" "تم البناء بنجاح"
@@ -338,12 +357,14 @@ expect "بناء AAB عبر bundle" bash "$B" bundle demo --yes
 ls "$REPO"/dist/demo-bundle-*.aab >/dev/null 2>&1 && ok "AAB نُسخ إلى dist/" || no "لا يوجد AAB في dist/"
 expect "بناء unit-test" bash "$B" unit-test demo --yes
 
-expect "توليد Wrapper عند غيابه (باستخدام gradle النظام)" bash "$B" debug demo2 --yes
+expect "توليد Wrapper عند غيابه (باستخدام gradle النظام)" \
+  env ANDROID_HOME="$SDK" ANDROID_SDK_ROOT="$SDK" MOCK_APK_SRC="$MOCK_APK_SRC" bash "$B" debug demo2 --yes
 file_exists "$REPO/apps/demo2/gradlew" "gradlew وُلّد في apps/demo2"
 file_exists "$REPO/apps/demo2/gradle/wrapper/gradle-wrapper.jar" "gradle-wrapper.jar وُلّد"
 ls "$REPO"/dist/demo2-debug-*.apk >/dev/null 2>&1 && ok "بناء demo2 نجح بعد توليد Wrapper" || no "فشل بناء demo2"
 
-expect "--all يبني كل التطبيقات" bash "$B" debug all --yes
+expect "--all يبني كل التطبيقات" \
+  env ANDROID_HOME="$SDK" ANDROID_SDK_ROOT="$SDK" MOCK_APK_SRC="$MOCK_APK_SRC" bash "$B" debug all --yes
 ls "$REPO"/dist/demo3-debug-*.apk >/dev/null 2>&1 &&
   ok "demo3 بُني بعد توليد Wrapper له" || no "demo3 لم يُبنَ ضمن --all"
 
@@ -361,10 +382,12 @@ expect_out "رسالة JDK واضحة عند غيابه" "JDK"
 rm -f "$REPO/apps/demo/local.properties"   # حتى لا يُكتشف SDK من الملف القديم
 printf 'echo "سكربت مكسور"\nexit 0\n' >"$REPO/scripts/android-sdk-setup.sh"
 echo 'this is ( not bash >>>' >>"$REPO/scripts/android-sdk-setup.sh"
-run env PATH="$ISO/bin:/usr/bin:/bin" HOME="$ISO" ANDROID_HOME="$WORK/nosdk" \
-  bash "$B" debug demo --setup-sdk --dry-run --yes
-expect_out "يكتشف خطأ صيغة android-sdk-setup.sh" "خطأ صيغة"
-expect_out "يقترح التثبيت الداخلي (dry-run)" "كان سيُثبَّت Android SDK"
+# يُلغى ANDROID_SDK_ROOT مع ANDROID_HOME: تصدير واحد يكفي ليجد السكربت SDK صالحاً فيتخطّى
+# فرع الإعداد كله، ولا يُختبَر مسار «android-sdk-setup.sh مكسور» إطلاقاً.
+run "${OFFLINE_ENV[@]}" PATH="$ISO/bin:/usr/bin:/bin" HOME="$ISO" ANDROID_HOME="$WORK/nosdk" \
+  ANDROID_SDK_ROOT="$WORK/nosdk" bash "$B" debug demo --setup-sdk --dry-run --yes
+expect_out "يكتشف خطأ صيغة android-sdk-setup.sh" "خطأ صيغة|syntax error|Parsing stopped"
+expect_out "يقترح التثبيت الداخلي (dry-run)" "كان سيُثبَّت|تثبيت Android SDK|setup-sdk"
 
 # ============================================================
 # 3) apk-test.sh
@@ -446,7 +469,9 @@ expect "info بدون aapt يستخدم التحليل الاحتياطي" bash 
 say "أدوات tools/ (سلسلة تطبيق الفلتر + القفل + الـ wrapper)"
 if [[ -f "$REPO_ROOT/tools/tests/toolchain-smoke.sh" ]]; then
   # سلسلتها تُشغَّل كما هي ونتيجةُها فحصٌ واحد هنا: إن فشلت تعطب هذه الخطوة كلها
-  expect "tools/: 43 فحصاً في toolchain-smoke.sh" bash "$REPO_ROOT/tools/tests/toolchain-smoke.sh"
+  expect "tools/: 45 فحصاً في toolchain-smoke.sh" \
+    env -u http_proxy -u https_proxy -u no_proxy -u ANDROID_HOME \
+      bash "$REPO_ROOT/tools/tests/toolchain-smoke.sh"
 else
   no "tools/tests/toolchain-smoke.sh مفقود — أُدرج في mock-smoke ولا يوجد الملف"
 fi

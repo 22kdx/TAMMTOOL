@@ -129,6 +129,16 @@ gradle --no-daemon --console=plain :app:assembleDebug     # نفس أمر CI (Gr
 cd ../.. && ./scripts/build-apk.sh debug marketer --no-daemon --yes
 ```
 
+### 1.6 أول فشل **صادق** على `arena/68a3e358` — وما كشفه (2026‑11‑06، ليلاً) ✅
+
+`42273932002` · `completed · failure` بعد 6 دقائق لكل وظيفتين؛ سبب الفشل هذه المرة حقيقي ومفصَّل:
+`Java heap space` في D8 (لا `org.gradle.jvmargs` في `apps/*/gradle.properties`) + إحداثية Compose
+غير موجودة في `orders-delivery`. التفاصيل والإصلاحات في `GAP_TO_APK.md` §8 و§2.4 أعلاه.
+
+**العبرة لأي وكيل:** إذا مرّت `Install Android SDK`/`Install Gradle`/`Self-test` وفشل `Build debug APK`
+فالمشكلة في `apps/` أو في `gradle.properties` الخاص بها — **لا** في السكربتات/CI، ولا تُصلح بزيادة
+مهلة أو بتجاهل الفشل. وإن نجحت كل الخطوات بلا APK ⇒ البوّابة (`Gate`) هي التي تكشف ذلك الآن.
+
 ### 1.5 الحالة بتاريخ 2026-11-06 (مساءً): **CI أخضر بلا APK** — فشل صامت ✅
 
 بعد إضافة `continue-on-error: true` إلى خطوة السجل، صارت التشغيلات **تنجح** بينما لم يُبنَ شيء:
@@ -181,6 +191,18 @@ file <apk> && unzip -l <apk> | grep -c classes.dex
 | `Permission denied` على `./gradlew` | فقد صلاحية التنفيذ (NTFS/WSL) | `chmod +x gradlew` أو `sh ./gradlew` أو `git update-index --chmod=+x gradlew` |
 
 ---
+
+### 2.4 `Could not find androidx.compose.material:material-window-size-class:1.6.4` ✅
+
+رُصد في CI ‏42273932002 على `apps/orders-delivery` داخل `:app:dataBindingMergeDependencyArtifactsDebug`.
+
+* **السبب:** إحداثية غير موجودة — `window-size-class` تُنشر تحت
+  `androidx.compose.material3:material3-window-size-class`، لا تحت `androidx.compose.material`.
+  ولا يوجد أي `import` لها في الشيفرة ⇒ تابعة ميتة، فحُذفت (مع تعليق في `build.gradle.kts` يسمّي البديل).
+* **القاعدة العامة:** رسالة `Could not find <g>:<a>:<v>` في `debugCompileClasspath` تُصحَّح **بمسار
+  الإحداثية/النسخة** لا بتعطيل المهمة؛ وتعطيل `dataBinding` هنا جاء لأنه بلا أي ملف `layout/*.xml`
+  في التطبيقين (Compose فقط)، فهو خيار يُقلّل tasks والاستهلاك لا «تحييد» للخطأ.
+* **تحقق محلي سريع:** `grep -rn "window-size-class" apps/*/*/build.gradle.kts` (يجب أن يُظهر تعليقاً لا `implementation`).
 
 ## 3. أخطاء JDK / Java
 

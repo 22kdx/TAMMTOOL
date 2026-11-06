@@ -650,3 +650,16 @@ Wrapper لكل مشروع + `echo -e`). `bash -n` نظيف على `scripts/*.sh`
   الكبيرة (Console)، C2/C4 (قرار منتج)، وأرقام build-tools الموحّدة.
 * لذلك «حللت كل المشاكل» تعني: **12 من 16 بنداً مُطبَّقة في الشيفرة وقابلة للتحقق offline**،
   و4 بنود موثَّقة كقرارات/عيوب متبقية بحكم مالكية الملفات — الجدول في `GAP_TO_APK.md` §7.
+
+### 10.5 تحديث بعد أول CI حقيقي (‏42273932002 · `failure` صادق): خطأ جديد لم يكن في القائمة
+
+دفع الـ push هذا التشغيل، فكُشِف سببان حقيقيان وأُصلحا فوراً (`GAP_TO_APK.md` §8):
+
+1. **للوكيل 1:** `apps/orders-delivery/app/build.gradle.kts` كان يعلن
+   `androidx.compose.material:material-window-size-class:1.6.4` — **إحداثية غير موجودة** (الصحيح
+   `androidx.compose.material3:material3-window-size-class:1.2.1`) ولا تُستخدم في أي ملف. حذفتها،
+   وحذفت `viewBinding`/`dataBinding` (لا `layout/*.xml` عندكما). لا تُعِدهما «للأمان».
+2. **لي (ولمن يراجع الدمج):** A2 ضاع في الدمج — `apps/*/gradle.properties` لم يكن متعارضاً فأخذ
+   نسخة فرع الكود الخالية من `org.gradle.jvmargs` ⇒ `D8: Java heap space`. أعدته (4g + Kotlin 1536m
+   + kapt process + `enableJetifier=false`). **القاعدة:** بعد أي `git merge`، راجع `git diff HEAD^1 --
+   '*/gradle.properties'` قبل أن declare أن رقعة «طُبِّقت» — الحالة في الجداول تُثبَت بالأمر لا بالنية.

@@ -83,8 +83,9 @@ android {
 
     buildFeatures {
         compose = true
-        viewBinding = true
-        dataBinding = true
+        // viewBinding/dataBinding معطّلان: لا يوجد أي ملف layout XML ولا أي *Binding مُستخدم.
+        // dataBinding كان يضيف مهمة :app:dataBindingMergeDependencyArtifactsDebug التي تفشل
+        // عند أي خطأ في classpath (رُصدت في CI 42273932002) بلا أي فائدة هنا.
     }
 
     composeOptions {

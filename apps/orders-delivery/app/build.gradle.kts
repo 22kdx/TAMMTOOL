@@ -83,8 +83,9 @@ android {
 
     buildFeatures {
         compose = true
-        viewBinding = true
-        dataBinding = true
+        // viewBinding/dataBinding معطّلان: لا يوجد أي ملف layout XML ولا أي *Binding مُستخدم.
+        // dataBinding كان يضيف مهمة :app:dataBindingMergeDependencyArtifactsDebug التي تفشل
+        // عند أي خطأ في classpath (رُصدت في CI 42273932002) بلا أي فائدة هنا.
     }
 
     composeOptions {
@@ -130,7 +131,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview:1.6.4")
     implementation("androidx.compose.material:material:1.6.4")
     implementation("androidx.compose.material:material-icons-extended:1.6.4")
-    implementation("androidx.compose.material:material-window-size-class:1.6.4")
+    // حُذفت: androidx.compose.material:material-window-size-class:1.6.4 غير منشور في google()
+    //   (الاسم الصحيح androidx.compose.material3:material3-window-size-class) ولا يوجد أي Use
+    //   في الشيفرة — كانت سبب فشل :app:dataBindingMergeDependencyArtifactsDebug / debugCompileClasspath
     implementation("androidx.navigation:navigation-compose:2.7.5")
 
     // Hilt Navigation Compose

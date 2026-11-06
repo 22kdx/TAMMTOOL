@@ -17,7 +17,7 @@ fun DashboardScreen(onNavigateTo: (String) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         TopAppBar(
-            title = { Text("لوحة التحكم - المسوق") },
+            title = { Text("لوحة التحكم - طلبات الأفغاني") },
             colors = TopAppBarDefaults.mediumTopAppBarColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
             )

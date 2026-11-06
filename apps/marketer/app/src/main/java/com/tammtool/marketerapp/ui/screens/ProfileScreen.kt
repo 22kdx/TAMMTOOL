@@ -40,7 +40,7 @@ fun ProfileScreen(
                 Text(text = u.fullName, style = MaterialTheme.typography.headlineSmall)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(text = u.phone, style = MaterialTheme.typography.bodyLarge)
-                Text(text = "المسوق", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                Text(text = "طلبات الأفغاني - المسوق", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 Text(text = "الرصيد: ${u.walletBalance} ريال", style = MaterialTheme.typography.bodyMedium)
                 Text(text = "سقف الدين: ${u.debtLimit} ريال", style = MaterialTheme.typography.bodyMedium)
                 Text(text = "نسبة العمولة: ${u.commissionRate}%", style = MaterialTheme.typography.bodyMedium)

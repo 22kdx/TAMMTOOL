@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">تطبيق المسوق</string>
+    <string name="app_name">طلبات الأفغاني</string>
     <string name="login">تسجيل الدخول</string>
     <string name="phone">رقم الهاتف</string>
     <string name="password">كلمة المرور</string>

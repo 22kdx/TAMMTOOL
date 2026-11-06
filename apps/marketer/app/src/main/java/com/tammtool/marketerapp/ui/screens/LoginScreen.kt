@@ -37,7 +37,7 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "تطبيق المسوق",
+            text = "طلبات الأفغاني",
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -111,7 +111,7 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "تطبيق مخصص للمسوقين فقط",
+            text = "تطبيق مخصص للمسوقين - طلبات الأفغاني",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

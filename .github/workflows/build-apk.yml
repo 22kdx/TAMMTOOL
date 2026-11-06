@@ -110,7 +110,9 @@ jobs:
 
       - name: Find and upload APK artifact
         if: always()
+        continue-on-error: true
         run: |
+          set +e
           echo "=== Searching for APK files ==="
           find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
           echo ""
@@ -121,8 +123,17 @@ jobs:
             mkdir -p apk-output
             cp "$APK_PATH" apk-output/app-debug.apk
           else
-            echo "No app-debug.apk found, creating placeholder"
-            echo "No APK was built" > apk-output/no-apk.txt
+            echo "No app-debug.apk found, checking for any APK..."
+            ANY_APK=$(find . -name "*.apk" -type f 2>/dev/null | head -1)
+            if [[ -n "$ANY_APK" ]]; then
+              echo "Found APK: $ANY_APK"
+              mkdir -p apk-output
+              cp "$ANY_APK" apk-output/app-debug.apk
+            else
+              echo "No APK was built, creating placeholder"
+              mkdir -p apk-output
+              echo "No APK was built" > apk-output/no-apk.txt
+            fi
           fi
       - name: Upload APK artifact
         if: always()

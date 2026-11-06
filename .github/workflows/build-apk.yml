@@ -75,19 +75,36 @@ jobs:
         env:
           ANDROID_HOME: $HOME/android-sdk
         run: |
+          echo "=== SDK DIRECTORY ==="
+          ls -la $HOME/android-sdk/
+          echo "=== SDK Platforms ==="
+          ls -la $HOME/android-sdk/platforms/ 2>/dev/null || echo "No platforms dir"
+          echo "=== SDK Build Tools ==="
+          ls -la $HOME/android-sdk/build-tools/ 2>/dev/null || echo "No build-tools dir"
+          echo ""
           echo "=== BUILD START $(date) ===" > ci-build.log
           echo "JAVA_HOME=$JAVA_HOME" >> ci-build.log
           echo "ANDROID_HOME=$ANDROID_HOME" >> ci-build.log
           echo "=== RUNNING GRADLEW ===" >> ci-build.log
           set +e
           set -o pipefail
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace --info 2>&1 | tee -a ci-build.log
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace --info --debug 2>&1 | tee -a ci-build.log
           BUILD_EXIT=$?
           set +o pipefail
           echo "=== BUILD EXIT CODE: $BUILD_EXIT ===" | tee -a ci-build.log
           echo "=== Build output directory contents ===" | tee -a ci-build.log
-          find app/build -type f 2>/dev/null | head -30 | tee -a ci-build.log || echo "No build output files found" | tee -a ci-build.log
+          find app/build -type f 2>/dev/null | head -50 | tee -a ci-build.log || echo "No build output files found" | tee -a ci-build.log
           echo "BUILD_EXIT=$BUILD_EXIT" >> $GITHUB_ENV
+
+      - name: Upload build log as artifact
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketer-ci-build-log
+          path: apps/marketer/ci-build.log
+          retention-days: 30
+          if-no-files-found: warn
 
       - name: Save build log to repository (always)
         if: always()

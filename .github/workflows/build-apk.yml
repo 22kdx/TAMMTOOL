@@ -73,14 +73,21 @@ jobs:
         env:
           ANDROID_HOME: $HOME/android-sdk
         run: |
-          echo "=== BUILD START ===" > ci-build.log
-          echo "JAVA_HOME=$JAVA_HOME" >> ci-build.log
-          echo "ANDROID_HOME=$ANDROID_HOME" >> ci-build.log
-          echo "=== RUNNING GRADLE ===" >> ci-build.log
+          echo "=== Current directory ==="
+          pwd
+          echo "=== GITHUB_WORKSPACE ==="
+          echo "$GITHUB_WORKSPACE"
+          echo "=== Files in current directory ==="
+          ls -la
+          echo ""
+          echo "=== BUILD START ===" > "$GITHUB_WORKSPACE/ci-build.log"
+          echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_WORKSPACE/ci-build.log"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_WORKSPACE/ci-build.log"
+          echo "=== RUNNING GRADLE ===" >> "$GITHUB_WORKSPACE/ci-build.log"
           set +e
-          gradle :app:assembleDebug --stacktrace --info >> ci-build.log 2>&1
+          gradle :app:assembleDebug --stacktrace --info >> "$GITHUB_WORKSPACE/ci-build.log" 2>&1
           BUILD_EXIT=$?
-          echo "=== BUILD EXIT: $BUILD_EXIT ===" >> ci-build.log
+          echo "=== BUILD EXIT: $BUILD_EXIT ===" >> "$GITHUB_WORKSPACE/ci-build.log"
           echo "BUILD_EXIT=$BUILD_EXIT" >> $GITHUB_ENV
           # Don't exit here - let the job continue to save the log
 
@@ -101,15 +108,20 @@ jobs:
       - name: Save build log to repository (always)
         if: always()
         run: |
-          echo "=== Saving ci-build.log ==="
-          if [[ -f apps/marketer/ci-build.log ]]; then
+          echo "=== Current directory ==="
+          pwd
+          echo "=== GITHUB_WORKSPACE ==="
+          echo "$GITHUB_WORKSPACE"
+          echo "=== ci-build.log check ==="
+          if [[ -f "$GITHUB_WORKSPACE/ci-build.log" ]]; then
+            echo "ci-build.log found at $GITHUB_WORKSPACE/ci-build.log, size: $(wc -c < "$GITHUB_WORKSPACE/ci-build.log") bytes"
             echo "=== Content ==="
-            cat apps/marketer/ci-build.log
+            cat "$GITHUB_WORKSPACE/ci-build.log"
           else
-            echo "ci-build.log NOT FOUND at apps/marketer/ci-build.log"
+            echo "ci-build.log NOT FOUND at $GITHUB_WORKSPACE/ci-build.log"
             echo "Searching for ci-build.log..."
             find . -name "ci-build.log" -type f 2>/dev/null || echo "Not found anywhere"
-            echo "NO BUILD OUTPUT" > apps/marketer/ci-build.log
+            echo "NO BUILD OUTPUT" > "$GITHUB_WORKSPACE/ci-build.log"
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

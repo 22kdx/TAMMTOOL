@@ -14,6 +14,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: arena/6b69a15d-tammtool
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -80,27 +81,7 @@ jobs:
         run: |
           echo "sdk.dir=$HOME/android-sdk" > local.properties
 
-      - name: Diagnose Gradle configuration
-        working-directory: apps/marketer
-        env:
-          ANDROID_HOME: $HOME/android-sdk
-        run: |
-          echo "=== settings.gradle.kts ==="
-          cat settings.gradle.kts
-          echo ""
-          echo "=== build.gradle.kts (root) ==="
-          cat build.gradle.kts
-          echo ""
-          echo "=== app/build.gradle.kts ==="
-          cat app/build.gradle.kts
-          echo ""
-          echo "=== local.properties ==="
-          cat local.properties
-          echo ""
-          echo "=== Gradle projects ==="
-          gradle projects 2>&1 || true
-
-      - name: Build Debug APK - print errors as annotations
+      - name: Build Debug APK - save log to file
         working-directory: apps/marketer
         env:
           ANDROID_HOME: $HOME/android-sdk
@@ -108,15 +89,20 @@ jobs:
         run: |
           echo "=== Starting Gradle build ==="
           set +e
-          gradle :app:assembleDebug --stacktrace 2>&1 | while IFS= read -r line; do
-            echo "$line"
-            if echo "$line" | grep -qiE "error:|exception|failed|cannot|unable|not found|undefined|unresolved"; then
-              echo "::error::$line"
-            fi
-          done
-          BUILD_EXIT=${PIPESTATUS[0]}
+          gradle :app:assembleDebug --stacktrace --info > $GITHUB_WORKSPACE/ci-build.log 2>&1
+          BUILD_EXIT=$?
           echo "=== Gradle build exit code: $BUILD_EXIT ==="
           exit $BUILD_EXIT
+
+      - name: Save build log to repository
+        if: failure()
+        run: |
+          cd $GITHUB_WORKSPACE
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ci-build.log
+          git commit -m "Add CI build log from run ${{ github.run_id }}" || true
+          git push origin arena/6b69a15d-tammtool || true
 
       - name: Upload APK artifact
         if: success()

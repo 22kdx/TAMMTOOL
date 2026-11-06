@@ -128,8 +128,16 @@ if [[ -z "${CI_REPO:-}" ]]; then
   if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
     CI_REPO="$GITHUB_REPOSITORY"
   else
-    CI_REPO="$(git -C "$PROJECT_ROOT" remote get-url origin 2>/dev/null |
-      sed -n 's|.*github\.com[:/]\([^/]*/[^/]*\)\(\.git\)\{0,1\}$|\1|p')" || true
+    local_url="$(git -C "$PROJECT_ROOT" remote get-url origin 2>/dev/null || printf '')"
+    local_url="${local_url%/}"; local_url="${local_url%.git}"
+    case "$local_url" in
+      *github.com/*) CI_REPO="${local_url##*github.com/}" ;;
+      *github.com:*) CI_REPO="${local_url##*github.com:}" ;;
+      *)             CI_REPO="" ;;
+    esac
+    # قد يبقى مستخدم المصادقة في البادئة (ssh/https) — نريد owner/repo فقط
+    CI_REPO="${CI_REPO##*@}"
+    [[ "$CI_REPO" == */* && "${CI_REPO#*/}" != */* ]] || CI_REPO=""
   fi
 fi
 [[ -n "${CI_REPO:-}" ]] || die "تعذّر اكتشاف المستودع — استخدم --repo owner/name"

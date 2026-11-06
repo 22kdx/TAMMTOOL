@@ -134,6 +134,34 @@ class BuildToolsTests(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertIn('BUILD_EXIT=0', p.stdout)
 
+    def test_sdk_preflight_complete_without_adb(self):
+        sdk = self.root / 'sdk'
+        platform = sdk / 'platforms/android-35'
+        platform.mkdir(parents=True)
+        (platform / 'android.jar').write_bytes(b'jar')
+        tools = sdk / 'build-tools/35.0.0'
+        tools.mkdir(parents=True)
+        for name in ('aapt2', 'zipalign', 'apksigner'):
+            tool = tools / name
+            tool.write_text('#!/bin/sh\nexit 0\n')
+            tool.chmod(0o755)
+        self.env.update(ANDROID_HOME=str(sdk), ANDROID_SDK_ROOT=str(sdk),
+                        ANDROID_API_LEVEL='35', ANDROID_BUILD_TOOLS_VERSION='35.0.0')
+        p = self.run_script('check-sdk.sh')
+        self.assertEqual(p.returncode, 0, p.stderr)
+        (tools / 'aapt2').unlink()
+        p = self.run_script('check-sdk.sh')
+        self.assertNotEqual(p.returncode, 0)
+        self.assertIn('aapt2', p.stderr)
+
+    def test_sdk_preflight_rejects_wrong_platform(self):
+        sdk = self.root / 'sdk'
+        sdk.mkdir()
+        self.env.update(ANDROID_HOME=str(sdk), ANDROID_API_LEVEL='35')
+        p = self.run_script('check-sdk.sh')
+        self.assertNotEqual(p.returncode, 0)
+        self.assertIn('android-35', p.stderr)
+
     def test_gradle_failure(self):
         self.projects(fail=True)
         p = self.run_script('build-apk.sh')

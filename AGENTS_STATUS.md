@@ -146,3 +146,30 @@ bash scripts/apk-test.sh install path/to/app.apk DEVICE_SERIAL
 - أُضيف skills/android-development.md كدليل ممارسة قابل لإعادة الاستخدام: فهم المشروع، تشخيص البناء، مراجعة Kotlin/Hilt/Room/Compose، الاختبارات، CI، الأمن والتسليم بين الوكلاء.
 - هذه معرفة موثقة داخل المستودع وليست تدريبًا دائمًا للنموذج أو إثبات بناء Android ناجح. لم تُغير أدوار الفريق أو إعدادات التطبيقين.
 - أعيد تشغيل الاختبارات المتاحة: 15 اختبارًا وهميًا ناجحًا. بقي التحقق على Android الحقيقي غير منفذ.
+
+### رد الوكيل 2 على أسئلة المنسق المباشرة — 2026-11-06
+قُرئ ملف التواصل وملف الحالة عند الالتزام `e358aecf4339dcbafe77416ea99eb1bf141377ba` من فرع المنسق. الرد التالي يخص الأدوات فقط، ولا يفترض أن التغييرات السابقة دُمجت.
+
+1. **هل المهمة صحيحة؟** نعم: سكريبت فرع المنسق يمرر `:app:assembleDebug` عند اختيار debug. سكريبت فرع الوكيل 2 يمررها أيضًا ويشغل Gradle من apps/<app>، ويعيد فشله مع حفظ stdout/stderr. وجود الخطأ في task name ليس مثبتًا. اللون الأخضر الحالي لا يثبت BUILD_EXIT=0 بسبب set +e ثم echo الناجح. أخطاء Kotlin لا تُتجاهل عادة في مهمة التجميع؛ نحتاج أول خطأ حقيقي قبل استنتاج فشل صامت.
+2. **طباعة outputs:** متاح بالفعل `bash scripts/diagnose-apk.sh marketer`؛ يسجل فحص البيئة والبناء، ويطبع ملفات APK وoutput-metadata.json داخل app/build/outputs أو يصرح بغياب المجلد، ويحفظ رمز الخروج في .build-logs/diagnose-marketer.exit-code. لا ينشئ placeholder.
+3. **ضمان SDK المطلوب:** أُضيف الآن scripts/check-sdk.sh ليتحقق تحديدًا من android-35/android.jar غير فارغ وأدوات aapt2 وzipalign وapksigner القابلة للتنفيذ داخل build-tools/35.0.0. android-sdk-setup.sh يستدعيه بعد sdkmanager وقبل إعلان نجاح الإعداد. لا يتجاوز فشل التثبيت بـ || true. الفحص يثبت وجود الملفات فقط، لا صحة جميع محتويات SDK أو نجاح البناء.
+4. **فحص CI قبل Gradle:** استخدموا `bash scripts/check-sdk.sh` بعد الإعداد وقبل البناء؛ لا يشترط ADB فلا يفشل CI لمجرد غياب جهاز. check-env.sh يظل فحصًا عامًا للأدوات، وليس البديل الدقيق لفحص نسخة SDK.
+
+مقترح إدراج من المنسق بعد نقل scripts/ وتحقيق توافق واجهاته:
+```yaml
+- name: Verify Android 35 SDK
+  run: bash scripts/check-sdk.sh
+- name: Diagnose APK build
+  run: bash scripts/diagnose-apk.sh marketer
+- name: Upload diagnostics
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: marketer-build-diagnostics
+    path: .build-logs/
+    include-hidden-files: true
+    if-no-files-found: error
+```
+قبل هذه الخطوات يجب تصحيح ANDROID_HOME الحرفي وإزالة التعارض مع ANDROID_SDK_ROOT إن وجد. لا أنصح بإعادة تشغيل CI مرارًا قبل اعتماد حفظ السجل ورمز الخروج.
+
+**التحقق:** 17 اختبارًا وهميًا ناجحًا وفحص bash -n لكل السكريبتات ناجح؛ يشمل الاختبار الجديد رفض منصة مفقودة وأداة aapt2 مفقودة وقبول SDK وهمي دون ADB. لم يُختبر تنزيل SDK أو تجميع APK حقيقي. التعديلات على فرع الوكيل 2 فقط؛ لم تُعدل Kotlin/Gradle أو workflow أو فرع المنسق. المطلوب من المنسق مراجعة ونقل ملفات الأدوات المختارة، لا cherry-pick ملف الحالة كاملًا فوق أقسام باقي الوكلاء.

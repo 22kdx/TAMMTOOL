@@ -39,6 +39,8 @@ else
   echo 'Licenses will be requested interactively; CI should set ANDROID_ACCEPT_LICENSES=1 after reviewing them.'
 fi
 "$manager" --sdk_root="$sdk" 'platform-tools' "platforms;android-$api" "build-tools;$build_tools"
+# Do not claim installation succeeded merely because sdkmanager exited zero.
+ANDROID_API_LEVEL="$api" ANDROID_BUILD_TOOLS_VERSION="$build_tools" bash "$(dirname -- "${BASH_SOURCE[0]}")/check-sdk.sh"
 if [[ -n ${GITHUB_ENV:-} ]]; then printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' "$sdk" "$sdk" >> "$GITHUB_ENV"; fi
 if [[ -n ${GITHUB_PATH:-} ]]; then printf '%s\n' "$sdk/platform-tools" "$sdk/cmdline-tools/latest/bin" "$sdk/build-tools/$build_tools" >> "$GITHUB_PATH"; fi
 printf 'SDK ready: %s\nFor local shells: export ANDROID_HOME="%s" ANDROID_SDK_ROOT="%s"\n' "$sdk" "$sdk" "$sdk"

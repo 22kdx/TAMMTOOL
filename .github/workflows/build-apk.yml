@@ -81,13 +81,15 @@ jobs:
             grep -nEi 'heap space|OutOfMemory|error:' "$log"
           } 2>/dev/null | awk 'NF && !seen[$0]++' | head -40 | sed -e 's/%/%25/g' -e 's/^/::error::/' || true
 
+      # الرفع دائم: إن أخفق اختبار أحمر فلا يجوز أن يُدفن APK مبنيّ فعلاً (حدث في 42284377251:
+      # Build debug APK = success و Gate = skipped و Upload = skipped ⇒ لا ملف لدى أحد).
       - name: Upload APK artifact
-        if: success()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.app }}-debug-apk
           path: dist/*.apk
-          if-no-files-found: error          # لا placeholder
+          if-no-files-found: warn           # لا وجود لملف بعد فشل البناء ليس خطأً بحد ذاته
           retention-days: 30
 
       - name: Upload build log (never commits to the branch)

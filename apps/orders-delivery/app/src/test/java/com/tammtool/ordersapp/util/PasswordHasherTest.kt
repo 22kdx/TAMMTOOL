@@ -61,7 +61,10 @@ class PasswordHasherTest {
     @Test
     fun weakStoredFormatIsRejected() {
         // iterations ضعيفة أو حقول ناقصة ⇒ لا دخول مهما طابق الباقي
-        assertFalse(PasswordHasher.verify(password, "pbkdf2:PBKDF2WithHmacSHA256:10$salt()$digest()"))
+        // صيغة صحيحة الحقول لكن بعدد دورات أقل من الحد ⇒ رفض إلزامي.
+        // (لا نكتب $salt داخل قالب Kotlin: «$x()» تُفسَّر كاستدعاء دالة وتفشل الترجمة.)
+        val weakFormat = "pbkdf2:PBKDF2WithHmacSHA256:10" + '$' + "ab".repeat(16) + '$' + "cd".repeat(32)
+        assertFalse(PasswordHasher.verify(password, weakFormat))
         assertFalse(PasswordHasher.verify(password, "pbkdf2:PBKDF2WithHmacSHA256:120000"))
     }
 

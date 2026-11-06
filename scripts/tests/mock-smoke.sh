@@ -285,7 +285,10 @@ export PATH="$BIN:/usr/bin:/bin"
 # الفحوص تفترض عالماً بلا شبكة (كما في sandbox الوكيل). على runner فيه اتصال كان ذلك كذباً:
 # فتنجح التنزيلات وتتغيّر الرسائل، فيُظن أن السكربت كُسر. نوقِف الشبكة حتمياً بمنفذ ميت —
 # أي أن «offline» يصبح حالة مُختبَرة، لا مصادفة بيئة. ولا نترك ANDROID_HOME الحقيقي يتسرّب.
-export ANDROID_HOME="${SDK:-$WORK/sdk}"
+export ANDROID_HOME="${SDK:-$WORK/sdk}" ANDROID_SDK_ROOT="${SDK:-$WORK/sdk}"
+# ANDROID_SDK_ROOT بدورها: apk-test.sh يبحث عن adb في $ANDROID_SDK_ROOT/platform-tools، وعلى runner
+# هذا متغير حقيقي (setup-android) فيجد adb «مثبتاً» رغم أننا حذفناه من الـ fake ⇒ رسالة أخرى
+# فيُظن أن السكربت كسر «شرح تثبيت platform-tools». (فشل 42291044401، والتعليق يقول: لم أجد: platform-tools)
 # لا بروكسي عالمي: تغيير «نوع» فشل الشبكة (refused بدل تعذّر حلّ الاسم) يقلب فحوصاً أخرى —
 # لذا تُلغَم الشبكة لكل فحص حساس لها على حدة عبر OFFLINE_ENV. (البروكسي العام كسر
 # «install-toolchain.sh --os/--arch» داخل mock-smoke بينما ينجح وحده: فرق 45✓ مقابل rc=1.)
@@ -469,8 +472,14 @@ expect "info بدون aapt يستخدم التحليل الاحتياطي" bash 
 say "أدوات tools/ (سلسلة تطبيق الفلتر + القفل + الـ wrapper)"
 if [[ -f "$REPO_ROOT/tools/tests/toolchain-smoke.sh" ]]; then
   # سلسلتها تُشغَّل كما هي ونتيجةُها فحصٌ واحد هنا: إن فشلت تعطب هذه الخطوة كلها
+  # بيئة نظيفة تماماً: فحوص tools/ لا تعرف شيئاً عن SDK ولا عن gradle ولا عن بروكسي المشغّل،
+  # ووراثتها لها (PATH مقلّص + ANDROID_* حقيقيان) هي التي أدمعت 45 فحصاً على runner وهي خضراء هنا.
+  # نحذف ما يسرّب فقط (SDK/Java/Gradle/البروكسي) ولا نُفرّغ البيئة: fحوص tools/ تحتاج git/python3/gh
+  # الموجودة في /usr/local/bin، و«env -i PATH=/usr/bin:/bin» حرمها منها فأنقص HOME أيضاً
+  # (و«--os/--arch يُقبلان» يحتاج gh + توكنه) — فصار الفارق بين «45/45» و«44/1» سببه اختباري لا أدواتي.
   expect "tools/: 45 فحصاً في toolchain-smoke.sh" \
-    env -u http_proxy -u https_proxy -u no_proxy -u ANDROID_HOME \
+    env -u http_proxy -u https_proxy -u no_proxy -u ANDROID_HOME -u ANDROID_SDK_ROOT \
+        -u JAVA_HOME -u GRADLE_HOME -u ANDROID_TOOLCHAIN \
       bash "$REPO_ROOT/tools/tests/toolchain-smoke.sh"
 else
   no "tools/tests/toolchain-smoke.sh مفقود — أُدرج في mock-smoke ولا يوجد الملف"

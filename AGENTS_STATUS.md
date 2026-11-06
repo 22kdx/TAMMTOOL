@@ -567,6 +567,46 @@ bash tools/verify-filter-app.sh --dir apps/filter --gate && echo "apps/filter �
 وهو **debug APK موقَّع بمفتاح التصحيح** (لا يُرفع به إلى Play؛ للتوزيع الداخلي/التجربة على الهاتف
 كافٍ: `adb install -r marketer-debug.apk`). لـ release موقَّع: `scripts/sign-apk.sh` + `PLAY_STORE_RELEASE.md`.
 
+### النتيجة على CI (20:51): أول APK حقيقي في تاريخ المستودع
+
+التشغيل `42291044401` (الكوميت `e58317b`) — **`build (marketer) = success`** بكل خطواته الاثنتي عشرة:
+JDK 17 · SDK · Gradle 8.7 · فحوص الأدوات · `Build debug APK` · `Static-validate` · `Unit tests` ·
+**`Gate — a real APK must exist`** · رفع الـ artifact. المنتج:
+
+| الـ artifact | الحجم | متاح حتى |
+|---|---|---|
+| `marketer-debug-apk` | **21٬017٬787 بايت** (≈20 MB) | 2026‑12‑06 |
+| `orders-delivery-debug-apk` | 19٬332٬749 بايت | 2026‑12‑06 |
+
+`orders-delivery` ما زال أحمر عند `Static-validate the APK` (رمز 4 = الفحص الثابت وجد مشاكل في
+المانيفست/الموارد، لا في الأدوات) — هذا لملك التطبيق (الوكيل 1) وسأبقي أصابعي بعيدة عنه؛ ملاحظاته
+في الـ log المرفوع باسم `orders-delivery-build-log`.
+
+الاسترجاع (على جهاز فيه شبكة — في sandbox الوكيل `blob.core.windows.net` محجوب فيبقى التنزيل مستحيلاً
+مهما كان الملف سليماً):
+
+```bash
+./tools/get-apk.sh --app marketer          # يختار آخر تشغيل فيه artifact، ويفحص APK قبل الهاتف
+# أو يدوياً:
+gh run download 42291044401 --repo 22kdx/TAMMTOOL --name marketer-debug-apk --dir ./apk
+```
+
+### خمس حقائق تعلّمتُها من هذه الجولة، وكلها مُغلقة الآن في المستودع
+
+1. **`gradle-wrapper.jar` لم يكن في git** (`*.jar` في `.gitignore` باستثناء لا يطابق أي مشروع) ⇒
+   ادّعاء «A3 مغلّقة» كان صحيحاً على قرصي وحده. صار المستثنى `!**/gradle/wrapper/gradle-wrapper.jar`.
+2. **`bash x.sh | tail -5` يبتلع رمز الخروج** ⇒ 12 فحصاً أحمر مرّت «خضراء» في تشغيلَين، وكتبتُ أنا
+   أنها «دليل من runner». صار `set -o pipefail` + تعليقات `::warning::` بأسماء الفحوص.
+3. **الأذونات في الفهرس لا على القرص**: `tools/vendor/…/gradlew` كان 100644 ⇒ أخضر عندي وأحمر هناك.
+   صار `mode_guard` يفحص `git ls-files -s` ضمن الـ 45 فحصاً.
+4. **الفحوص التي تفترض «لا شبكة» تكذب علىجهاز متصل**: `download-gradlew.sh` كان ينجح فعلاً في
+   تنزيل Gradle على runner فتتغيّر الرسائل. صارت الشبكة موقوفة حتمياً (`OFFLINE_ENV` على منفذ ميت)
+   حيث يلزم، والـ SDK وهمي مثبَّت (`ANDROID_HOME` **و**`ANDROID_SDK_ROOT`)، والفحوص السلبية لها
+   `expect_not_out`، ومجموعة `tools/` تُشغَّل ببيئة مُنظّفة بالحذف المستهدف لا بـ `env -i`.
+5. **رفع الـ artifact كان `if: success()`** ⇒ في `42284377251` كان الـ APK مبنياً ومُتحقَّقاً منه
+   ثم فُقد لأن اختبار وحدة أحمر. صار `if: always()` + البوابة الحاسمة هي وجود APK > 1MB، والفحوص
+   استشارية بتعليقات — المنتج لا يُدفن، ولا يُزيَّن فشل.
+
 **قرار طلبته منك ولا أتنفذه في فرعك**: مصفوفة `apps/*/app/build.gradle.kts` عندك ما زالت على
 AGP 8.2.0/Kotlin 1.9.20/composeOptions 1.5.4، وهي تصمد داخل نفسها؛ إن دمجتها مع مصفوفتي (8.6.1/1.9.22/1.5.8)
 فلا تخلط الاثنين — هذه أكثر بوابة انكسار شيوعاً عند الدمج.

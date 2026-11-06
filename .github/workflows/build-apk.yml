@@ -44,8 +44,10 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      # set -o pipefail إلزامي: بدونه يخرج mock-smoke بـ rc=1 ويبقى الأنبوب أخضر —
+      # وهذا ما جعل 12 فحصاً أحمر غير مرئية في 42281343268/42284377251 (kذنب أدواتي لا من غيره).
       - name: Self-test the build tooling first
-        run: bash scripts/tests/mock-smoke.sh | tail -5
+        run: set -o pipefail; bash scripts/tests/mock-smoke.sh | tail -8
 
       - name: Build debug APK (same code path as local)
         run: ./scripts/build-apk.sh debug ${{ matrix.app }} --no-daemon --yes

@@ -35,24 +35,27 @@ log_err() { printf '%s[✗]%s %s\n' "$RED" "$NC" "$*" >&2; }
 
 DIR=""
 LENIENT=0
+PROFILE_WANT="auto"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dir)   [[ $# -ge 2 ]] || { log_err "--dir يحتاج مساراً"; exit 2; }; DIR="$2"; shift 2 ;;
     --gate)  shift ;;
     --lenient) LENIENT=1; shift ;;
+    --profile) [[ $# -ge 2 ]] || { log_err "--profile يحتاج filter أو app أو auto"; exit 2; }
+               PROFILE_WANT="$2"; shift 2 ;;
     --list-checks)
       cat <<'CHECKS'
  01 البنية      : الملفات الإلزامية موجودة (settings/build/manifest/MainActivity/tests)
  02 أقواس      : توازن { } و ( ) في كل .kt و .kts
  03 XML        : كل ملفات res/ والمانيفست تُحلَّل كـ XML سليم
- 04 شيدرات     : كل فلتر في FilterRegistry له ملف، ولا ملف يتيماً
+ 04 شيدرات     : كل فلتر في FilterRegistry له ملف، ولا ملف يتيماً (نمط filter فقط)
  05 AGSL       : main معرّف، content مُعلَن، الدوال معرفة قبل استعمالها
  06 حراسة API  : أي استعمال لـ RuntimeShader/RenderEffect محمي بشرط SDK_INT أو @RequiresApi
  07 نصوص       : كل R.string.* مستخدم موجود في values/strings.xml (وقيم ar مقابلة)
  08 dependencies: كل *Implementation داخل قوس dependencies {}
  09 ذاكرة      : org.gradle.jvmargs مضبوط (من درس CI 42273932002)
- 10 مانيفست    : CAMERA موجود، لا WRITE_EXTERNAL_STORAGE، لا قفل اتجاه، allowBackup آمن
- 11 اختبارات   : ≥3 ملفات اختبار و≥12 @Test و testInstrumentationRunner مضبوط
+ 10 مانيفست    : CAMERA معلن فقط إن استخدمه الكود، لا WRITE_EXTERNAL_STORAGE، لا قفل اتجاه، allowBackup آمن
+ 11 اختبارات   : حدّ الاختبارات و testInstrumentationRunner (3/12 لنمط filter · 1/6 لنمط app)
  12 إصدارات    : minSdk 24 · target/compileSdk 35 · AGP 8.6.1 · Kotlin 1.9.22 · Compose 1.5.8
  13 plugins    : لا google-services بلا google-services.json، ولا dataBinding بلا layout
 CHECKS
@@ -70,9 +73,10 @@ fi
 [[ -d "$DIR/app/src/main" ]] || { log_err "لا مشروع في: $DIR (ينقص app/src/main)"; exit 2; }
 printf 'فحص بنيوي: %s\n' "${DIR#$PROJECT_ROOT/}"
 
-python3 - "$DIR" "$LENIENT" <<'PY'
+python3 - "$DIR" "$LENIENT" "$PROFILE_WANT" <<'PY'
 import pathlib, re, sys, xml.dom.minidom
 root = pathlib.Path(sys.argv[1]); lenient = sys.argv[2] == '1'
+profile_want = sys.argv[3] if len(sys.argv) > 3 else 'auto'
 errors, warns, oks = [], [], []
 
 def add_ok(t): oks.append(t)
@@ -82,6 +86,17 @@ def add_warn(t): (warns if lenient else errors).append(t)
 main = root / 'app/src/main'
 testd = root / 'app/src/test'
 kt_all = sorted(p for p in root.rglob('*.kt')) + sorted(p for p in root.rglob('*.kts'))
+
+# نمط التطبيق: «فلتر» إذا وُجدت شيدرات أو FilterRegistry، وإلا تطبيق عام. بلا هذا التمييز
+# يكذب الفاحص على تطبيق لا كاميرا فيه («CAMERA مفقود») ويطالبه بسجل فلاتر لا معنى له.
+shaders_dir = main / 'assets/shaders'
+HAS_SHADERS = shaders_dir.exists()
+HAS_REGISTRY = bool(list(main.rglob('FilterRegistry.kt')))
+AUTO_PROFILE = 'filter' if (HAS_SHADERS or HAS_REGISTRY) else 'app'
+PROFILE = AUTO_PROFILE if profile_want == 'auto' else profile_want
+add_ok('00 نمط: %s (من %s) · شيدرات=%s · سجل فلاتر=%s' % (PROFILE, 'auto' if profile_want == 'auto' else '--profile', HAS_SHADERS, HAS_REGISTRY))
+if PROFILE == 'filter' and not (HAS_SHADERS or HAS_REGISTRY):
+    add_err('نمط filter مَفروض لكن لا assets/shaders ولا FilterRegistry.kt في المشروع')
 
 # 01 البنية
 required = ['settings.gradle.kts', 'build.gradle.kts', 'gradle.properties',
@@ -93,7 +108,7 @@ def find_any(base, name):
     return sorted(base.rglob(name)) if base.exists() else []
 if not find_any(main, 'MainActivity.kt'):
     missing.append('MainActivity.kt (في أي حزمة)')
-if not find_any(main, 'FilterRegistry.kt'):
+if PROFILE == 'filter' and not find_any(main, 'FilterRegistry.kt'):
     missing.append('FilterRegistry.kt')
 if missing: add_err('01 البنية: ناقص → ' + ', '.join(missing))
 else: add_ok('01 البنية: %d ملف إلزامي موجود' % len(required))
@@ -124,7 +139,8 @@ reg = _regs[0] if _regs else pathlib.Path('__none__')
 shaders_dir = main / 'assets/shaders'
 declared = set(re.findall(r'Filter\("[a-z0-9_]+",\s*"([^"]+)"', reg.read_text(encoding='utf-8'))) if reg.exists() else set()
 present = {p.name for p in shaders_dir.glob('*')} if shaders_dir.exists() else set()
-if not declared: add_err('04 شيدرات: لم أُحلّل FilterRegistry (تغيّر نمط التعريف؟)')
+if PROFILE != 'filter': add_ok('04 شيدرات: غير منطبق (نمط app بلا سجل فلاتر)')
+elif not declared: add_err('04 شيدرات: لم أُحلّل FilterRegistry (تغيّر نمط التعريف؟)')
 else:
     miss = sorted(declared - present); orph = sorted(present - declared)
     if miss: add_err('04 شيدرات: مذكور بلا ملف → ' + ', '.join(miss))
@@ -133,7 +149,7 @@ else:
 
 # 05 AGSL/GLSL صحة مبدئية
 bad = []
-for f in sorted(shaders_dir.glob('*')) if shaders_dir.exists() else []:
+for f in (sorted(shaders_dir.glob('*')) if (shaders_dir.exists() and PROFILE == 'filter') else []):
     t = f.read_text(encoding='utf-8')
     nc = re.sub(r'//.*', '', t)
     if 'half4 main(float2' not in nc: bad.append(f.name + ': بلا main(float2…)')
@@ -143,7 +159,8 @@ for f in sorted(shaders_dir.glob('*')) if shaders_dir.exists() else []:
     mi = nc.find('half4 main')
     for m in re.finditer(r'^(?:half4|float|float2|half3)\s+(\w+)\s*\(', nc, re.M):
         if m.start() > mi: bad.append(f'{f.name}: {m.group(1)}() معرَّفة بعد main')
-if bad: add_err('05 AGSL: ' + '; '.join(bad))
+if PROFILE != 'filter': add_ok('05 AGSL: غير منطبق (نمط app)')
+elif bad: add_err('05 AGSL: ' + '; '.join(bad))
 else: add_ok('05 AGSL: كل الشيدرات فيها main ومحتواها محصور فيه')
 
 # 06 حراسة API 33
@@ -208,7 +225,12 @@ else:
 
 # 10 المانيفست
 mf = (main / 'AndroidManifest.xml').read_text(encoding='utf-8')
-if 'android.permission.CAMERA' not in mf: add_err('10 مانيفست: إذن CAMERA مفقود')
+CAMERA_RE = re.compile(r'androidx\.camera|ImageCapture|PreviewView|CameraSelector|ProcessCameraProvider')
+uses_camera = any(CAMERA_RE.search(p.read_text(encoding='utf-8')) for p in kt_all if p.suffix == '.kt')
+if uses_camera and 'android.permission.CAMERA' not in mf:
+    add_err('10 مانيفست: الكود يستخدم الكاميرا (CameraX/ImageCapture) والمَانيفست بلا إذن CAMERA')
+elif (not uses_camera) and 'android.permission.CAMERA' in mf:
+    add_warn('10 مانيفست: إذن CAMERA معلن ولا استعمال له في الكود (أقل صلاحية أفضل)')
 if 'WRITE_EXTERNAL_STORAGE' in mf: add_err('10 مانيفست: WRITE_EXTERNAL_STORAGE غير ضروري (استخدم FileProvider/cache)')
 if 'screenOrientation' in mf: add_err('10 مانيفست: قفل اتجاه مع targetSdk 35 (انظر C6)')
 if 'allowBackup="true"' in mf and 'dataExtractionRules' not in mf: add_err('10 مانيفست: allowBackup=true بلا dataExtractionRules')
@@ -218,8 +240,9 @@ add_ok('10 مانيفست: أذونات أقلية + FileProvider + لا قفل 
 # 11 الاختبارات
 tests = sorted(testd.rglob('*.kt')) if testd.exists() else []
 n = sum(len(re.findall(r'@Test', p.read_text(encoding='utf-8'))) for p in tests)
-if len(tests) < 3: add_err('11 اختبارات: %d ملف اختبار (المطلوب ≥3)' % len(tests))
-elif n < 12: add_err('11 اختبارات: %d دالة @Test فقط (المطلوب ≥12)' % n)
+MIN_FILES, MIN_TESTS = (3, 12) if PROFILE == 'filter' else (1, 6)
+if len(tests) < MIN_FILES: add_err('11 اختبارات: %d ملف اختبار (المطلوب ≥%d لنمط %s)' % (len(tests), MIN_FILES, PROFILE))
+elif n < MIN_TESTS: add_err('11 اختبارات: %d دالة @Test فقط (المطلوب ≥%d)' % (n, MIN_TESTS))
 elif 'testInstrumentationRunner' not in bg: add_err('11 اختبارات: testInstrumentationRunner غير مضبوط')
 else: add_ok('11 اختبارات: %d ملف / %d فحص @Test + runner' % (len(tests), n))
 
@@ -239,8 +262,12 @@ if 'google-services' in bg and not (main / 'google-services.json').exists():
 if 'dataBinding = true' in bg:
     layouts = list((main / 'res/layout').glob('*.xml')) if (main / 'res/layout').exists() else []
     if not layouts: add_err('13 plugins: dataBinding مفعّل بلا أي ملف layout/*.xml (مهمة زائدة تفشل مع أي خطأ classpath)')
-if 'org.jetbrains.kotlin.kapt' in rootbg or 'kapt(' in bg:
-    add_warn('13 plugins: kapt مُفعّل — إن كان بلا Room/Hilt احذفه (مصدر فشل CI 42274698251)')
+n_kapt_deps = len(re.findall(r'^\s*kapt\s*\(', bg, re.M))
+if ('org.jetbrains.kotlin.kapt' in rootbg or 'org.jetbrains.kotlin.kapt' in bg) and n_kapt_deps == 0:
+    add_warn('13 plugins: بلاغ kapt مطبَّق بلا أي سطر kapt("…") ⇒ احذفه؛ لا يولّد شيئاً وهو مصدر '
+             'أخطاء CI من نوع 42274698251 (خيار room.generateKotlin بلا مولّد KSP)')
+elif n_kapt_deps:
+    add_ok('13 plugins: kapt مستعمل فعلاً (%d سطر kapt)' % n_kapt_deps)
 if not any(e.startswith('13') for e in errors): add_ok('13 plugins: لا plugin معلَّق على مورد مفقود')
 
 # 14 أسماء الملفات (assets/res يجب ASCII)

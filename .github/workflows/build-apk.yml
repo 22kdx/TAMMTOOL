@@ -112,19 +112,21 @@ jobs:
         env:
           ANDROID_HOME: $HOME/android-sdk
           GRADLE_HOME: $HOME/gradle-8.5
-        continue-on-error: true
         run: |
           echo "=== Starting Gradle build ==="
+          set +e
           gradle :app:assembleDebug --stacktrace --info 2>&1 | tee build-output.log
-          echo "=== Gradle build exit code: $? ==="
+          BUILD_EXIT=$?
+          echo "=== Gradle build exit code: $BUILD_EXIT ==="
+          exit $BUILD_EXIT
 
       - name: Print build error as annotation
-        if: failure()
+        if: always()
         working-directory: apps/marketer
         run: |
           if [[ -f build-output.log ]]; then
-            echo "=== LAST 80 LINES OF BUILD LOG ==="
-            tail -80 build-output.log | while IFS= read -r line; do
+            echo "=== LAST 60 LINES OF BUILD LOG ==="
+            tail -60 build-output.log | while IFS= read -r line; do
               echo "::error::${line}"
             done
           fi

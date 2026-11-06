@@ -33,56 +33,46 @@ jobs:
 
       - name: Install Android SDK (Manual via curl)
         run: |
-          # إعداد مسارات Android SDK
           mkdir -p $HOME/android-sdk/cmdline-tools
           echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
           echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
 
-          # تحميل Android Command Line Tools من خوادم جوجل
           echo "جاري تحميل Android Command Line Tools..."
           curl -L --fail --retry 3 --retry-delay 5 \
             -o $HOME/android-sdk/cmdline-tools.zip \
             https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
 
-          # فك الضغط
           unzip -q -o $HOME/android-sdk/cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools/
           mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
           rm -f $HOME/android-sdk/cmdline-tools.zip
 
-          # قبول التراخيص
           mkdir -p $HOME/android-sdk/licenses
           echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $HOME/android-sdk/licenses/android-sdk-license
           echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/android-sdk/licenses/android-sdk-license
           echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $HOME/android-sdk/licenses/android-sdk-preview-license
           echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/android-sdk/licenses/android-sdk-preview-license
 
-          # تثبيت الحزم المطلوبة
           echo "جاري تثبيت platform-tools, platform android-35, build-tools 35.0.0..."
           yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --install \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0" > /dev/null 2>&1 || true
 
-          # التحقق من التثبيت
           $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --version
 
       - name: Install Gradle
         run: |
-          # تحميل توزيع Gradle 8.5
           echo "جاري تحميل Gradle 8.5..."
           curl -L --fail --retry 3 --retry-delay 5 \
             -o $HOME/gradle-8.5-bin.zip \
             https://services.gradle.org/distributions/gradle-8.5-bin.zip
 
-          # فك الضغط
           unzip -q -o $HOME/gradle-8.5-bin.zip -d $HOME/
           rm -f $HOME/gradle-8.5-bin.zip
 
-          # إضافة Gradle إلى PATH
           echo "GRADLE_HOME=$HOME/gradle-8.5" >> $GITHUB_ENV
           echo "PATH=$HOME/gradle-8.5/bin:$PATH" >> $GITHUB_ENV
 
-          # التحقق من التثبيت
           gradle --version
 
       - name: Create local.properties
@@ -90,24 +80,27 @@ jobs:
         run: |
           echo "sdk.dir=$HOME/android-sdk" > local.properties
 
-      - name: Verify local.properties
-        working-directory: apps/marketer
-        run: |
-          echo "=== local.properties contents ==="
-          cat local.properties
-          echo "=== Java version ==="
-          java -version 2>&1
-          echo "=== Gradle version ==="
-          gradle --version
-
-      - name: Configure Gradle project (diagnostic)
+      - name: Diagnose Gradle configuration
         working-directory: apps/marketer
         env:
           ANDROID_HOME: $HOME/android-sdk
-          GRADLE_HOME: $HOME/gradle-8.5
-        run: gradle :app:help
+        run: |
+          echo "=== settings.gradle.kts ==="
+          cat settings.gradle.kts
+          echo ""
+          echo "=== build.gradle.kts (root) ==="
+          cat build.gradle.kts
+          echo ""
+          echo "=== app/build.gradle.kts ==="
+          cat app/build.gradle.kts
+          echo ""
+          echo "=== local.properties ==="
+          cat local.properties
+          echo ""
+          echo "=== Gradle projects ==="
+          gradle projects 2>&1 || true
 
-      - name: Build Debug APK (طلبات الأفغاني) - capture logs
+      - name: Build Debug APK - print errors as annotations
         working-directory: apps/marketer
         env:
           ANDROID_HOME: $HOME/android-sdk
@@ -115,29 +108,15 @@ jobs:
         run: |
           echo "=== Starting Gradle build ==="
           set +e
-          gradle :app:assembleDebug --stacktrace --info 2>&1 | tee build-output.log
-          BUILD_EXIT=$?
+          gradle :app:assembleDebug --stacktrace 2>&1 | while IFS= read -r line; do
+            echo "$line"
+            if echo "$line" | grep -qiE "error:|exception|failed|cannot|unable|not found|undefined|unresolved"; then
+              echo "::error::$line"
+            fi
+          done
+          BUILD_EXIT=${PIPESTATUS[0]}
           echo "=== Gradle build exit code: $BUILD_EXIT ==="
           exit $BUILD_EXIT
-
-      - name: Print build error as annotation
-        if: always()
-        working-directory: apps/marketer
-        run: |
-          if [[ -f build-output.log ]]; then
-            echo "=== LAST 60 LINES OF BUILD LOG ==="
-            tail -60 build-output.log | while IFS= read -r line; do
-              echo "::error::${line}"
-            done
-          fi
-
-      - name: Upload build log as artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: apps/marketer/build-output.log
-          retention-days: 30
 
       - name: Upload APK artifact
         if: success()

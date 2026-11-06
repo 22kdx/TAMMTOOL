@@ -1,4 +1,10 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.tammtool.marketerapp.ui.screens
+
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,9 +27,9 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
 
-    val loading by authViewModel.loading.collectAsState()
-    val error by authViewModel.error.collectAsState()
-    val user by authViewModel.user.collectAsState()
+    val loading by authViewModel.loading.observeAsState(false)
+    val error by authViewModel.error.observeAsState()
+    val user by authViewModel.user.observeAsState()
 
     if (user != null) {
         onLoginSuccess()

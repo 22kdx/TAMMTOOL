@@ -1,4 +1,11 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.tammtool.marketerapp.ui.screens
+
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.Alignment
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -17,7 +24,7 @@ fun OrderDetailScreen(
     onBack: () -> Unit
 ) {
     val order = remember { mutableStateOf<MarketerOrder?>(null) }
-    val loading by viewModel.loading.collectAsState(initial = false)
+    val loading by viewModel.loading.observeAsState(initial = false)
 
     if (!loading && order.value == null) {
         viewModel.loadAllOrders()
@@ -37,7 +44,7 @@ fun OrderDetailScreen(
         )
 
         if (loading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
         } else {
             val currentOrder = order.value
             if (currentOrder != null) {
@@ -80,7 +87,7 @@ private fun DetailRow(label: String, value: String) {
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.FontWeight.W500)
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.W500)
         )
     }
 }

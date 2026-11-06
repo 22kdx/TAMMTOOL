@@ -1,5 +1,7 @@
 package com.tammtool.marketerapp.ui.viewmodel
 
+import kotlinx.coroutines.flow.first
+
 import androidx.lifecycle.*
 import com.tammtool.marketerapp.data.repository.MarketerNotificationRepository
 import com.tammtool.marketerapp.data.model.MarketerNotification

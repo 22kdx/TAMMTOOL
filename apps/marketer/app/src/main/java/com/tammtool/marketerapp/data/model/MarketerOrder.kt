@@ -10,10 +10,10 @@ import kotlinx.serialization.Serializable
 @Entity(
     tableName = "marketer_orders",
     indices = [
-        Index(value = ["orderNumber"], unique = true),
+        Index(value = ["order_number"], unique = true),
         Index(value = ["status"]),
-        Index(value = ["customerPhone"]),
-        Index(value = ["createdAt"])
+        Index(value = ["customer_phone"]),
+        Index(value = ["created_at"])
     ]
 )
 data class MarketerOrder(

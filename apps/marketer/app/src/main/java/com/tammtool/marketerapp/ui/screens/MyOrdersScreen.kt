@@ -1,4 +1,13 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.tammtool.marketerapp.ui.screens
+
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Alignment
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,8 +27,8 @@ fun MyOrdersScreen(
     viewModel: OrderViewModel = hiltViewModel(),
     onOrderSelected: (Int) -> Unit
 ) {
-    val orders by viewModel.orders.collectAsState(initial = emptyList())
-    val loading by viewModel.loading.collectAsState(initial = false)
+    val orders by viewModel.orders.observeAsState(initial = emptyList())
+    val loading by viewModel.loading.observeAsState(initial = false)
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -35,7 +44,7 @@ fun MyOrdersScreen(
         )
 
         if (loading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
         } else {
             if (orders.isEmpty()) {
                 Column(
@@ -64,7 +73,7 @@ fun MyOrdersScreen(
 private fun OrderCard(order: MarketerOrder, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(8.dp),
-        elevation = 2.dp
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -74,11 +83,11 @@ private fun OrderCard(order: MarketerOrder, onClick: () -> Unit) {
                 Text(
                     text = "طلب #${order.orderNumber}",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = androidx.compose.ui.text.FontWeight.Bold
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                 )
-                Chip(
+                SuggestionChip(onClick = {}, 
                     label = { Text(order.status.name) },
-                    colors = ChipDefaults.colors(
+                    colors = SuggestionChipDefaults.suggestionChipColors(
                         containerColor = statusColor(order.status).copy(alpha = 0.2f)
                     )
                 )
@@ -94,7 +103,7 @@ private fun OrderCard(order: MarketerOrder, onClick: () -> Unit) {
             ) {
                 Text(
                     text = "السعر: ${order.agreedPrice} ريال",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.FontWeight.W500)
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.W500)
                 )
                 Text(
                     text = "الكمية: ${order.quantity}",
@@ -118,6 +127,7 @@ private fun OrderCard(order: MarketerOrder, onClick: () -> Unit) {
     }
 }
 
+@Composable
 private fun statusColor(status: MarketerOrder.OrderStatus): androidx.compose.ui.graphics.Color = when (status) {
     MarketerOrder.OrderStatus.SUSPENDED -> MaterialTheme.colorScheme.secondary
     MarketerOrder.OrderStatus.IN_COMMUNICATION -> MaterialTheme.colorScheme.secondary

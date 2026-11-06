@@ -1,4 +1,11 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.tammtool.marketerapp.ui.screens
+
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -43,7 +50,7 @@ fun DashboardScreen(onNavigateTo: (String) -> Unit) {
             ) { action ->
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable { onNavigateTo(action.route) },
-                    elevation = 2.dp
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),

@@ -1,5 +1,7 @@
 package com.tammtool.marketerapp.ui.nav
 
+import androidx.compose.runtime.Composable
+
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.NavHost
@@ -31,7 +33,7 @@ fun AppNavGraph(
         composable(AppRoutes.LOGIN) {
             LoginScreen(authViewModel = authViewModel, onLoginSuccess = {
                 navController.navigate(AppRoutes.DASHBOARD) {
-                    popBackTo(AppRoutes.LOGIN) { inclusive = true }
+                    popUpTo(AppRoutes.LOGIN) { inclusive = true }
                 }
             })
         }

@@ -1,4 +1,14 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.tammtool.marketerapp.ui.screens
+
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Alignment
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -12,9 +22,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
 fun MyCommissionsScreen(viewModel: CommissionViewModel = hiltViewModel()) {
-    val commissions by viewModel.commissions.collectAsState(initial = emptyList())
-    val totalDue by viewModel.totalDue.collectAsState(initial = 0.0)
-    val totalPaid by viewModel.totalPaid.collectAsState(initial = 0.0)
+    val commissions by viewModel.commissions.observeAsState(initial = emptyList())
+    val totalDue by viewModel.totalDue.observeAsState(initial = 0.0)
+    val totalPaid by viewModel.totalPaid.observeAsState(initial = 0.0)
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -34,7 +44,7 @@ fun MyCommissionsScreen(viewModel: CommissionViewModel = hiltViewModel()) {
         ) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                elevation = 2.dp
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "ملخص العمولات", style = MaterialTheme.typography.titleMedium)
@@ -78,7 +88,7 @@ fun MyCommissionsScreen(viewModel: CommissionViewModel = hiltViewModel()) {
 private fun CommissionCard(commission: MarketerCommission) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(8.dp),
-        elevation = 2.dp
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -86,12 +96,12 @@ private fun CommissionCard(commission: MarketerCommission) {
         ) {
             Column {
                 Text(text = "طلب #${commission.orderNumber}", style = MaterialTheme.typography.titleMedium)
-                Text(text = "${commission.amount} ريال", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.FontWeight.W500))
+                Text(text = "${commission.amount} ريال", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.W500))
             }
             Spacer(modifier = Modifier.weight(1f))
-            Chip(
+            SuggestionChip(onClick = {}, 
                 label = { Text(commission.status.name) },
-                colors = ChipDefaults.colors(
+                colors = SuggestionChipDefaults.suggestionChipColors(
                     containerColor = when (commission.status) {
                         MarketerCommission.CommissionStatus.DUE -> MaterialTheme.colorScheme.secondaryContainer
                         MarketerCommission.CommissionStatus.PAID -> Color(0xFF4CAF50).copy(alpha = 0.2f)

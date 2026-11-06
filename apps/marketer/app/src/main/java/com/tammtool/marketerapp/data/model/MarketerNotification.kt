@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 @Entity(
     tableName = "marketer_notifications",
-    indices = [Index(value = ["is_read"]), Index(value = ["createdAt"])]
+    indices = [Index(value = ["is_read"]), Index(value = ["created_at"])]
 )
 data class MarketerNotification(
     @PrimaryKey(autoGenerate = true)

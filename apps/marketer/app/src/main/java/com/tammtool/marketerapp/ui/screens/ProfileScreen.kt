@@ -1,4 +1,11 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.tammtool.marketerapp.ui.screens
+
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.Alignment
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -15,7 +22,7 @@ fun ProfileScreen(
     authViewModel: AuthViewModel = hiltViewModel(),
     userViewModel: UserViewModel = hiltViewModel()
 ) {
-    val user by userViewModel.user.collectAsState(initial = null)
+    val user by userViewModel.user.observeAsState(initial = null)
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         TopAppBar(

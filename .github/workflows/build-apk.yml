@@ -45,6 +45,18 @@ jobs:
           set -o pipefail
           gradle :app:assembleDebug --stacktrace --console=plain 2>&1 | tee ci-build.log
 
+      - name: Annotate build errors
+        if: failure()
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          log = Path("apps/marketer/ci-build.log")
+          if log.exists():
+              lines = [line for line in log.read_text(errors="replace").splitlines() if line.startswith("e:") or "error:" in line or "What went wrong" in line or line.startswith("> ")]
+              for line in lines[:100]:
+                  print("::error::" + line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))
+          PYTHON
+
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4

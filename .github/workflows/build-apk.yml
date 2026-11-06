@@ -128,10 +128,11 @@ jobs:
           GRADLE_HOME: $HOME/gradle-8.5
         run: |
           echo "=== Starting Gradle build ==="
+          echo "BUILD_START" > $GITHUB_WORKSPACE/ci-build.log
           set +e
-          gradle :app:assembleDebug --stacktrace --info > $GITHUB_WORKSPACE/ci-build.log 2>&1
+          gradle :app:assembleDebug --stacktrace --info >> $GITHUB_WORKSPACE/ci-build.log 2>&1
           BUILD_EXIT=$?
-          echo "=== Gradle build exit code: $BUILD_EXIT ==="
+          echo "=== Gradle build exit code: $BUILD_EXIT ===" >> $GITHUB_WORKSPACE/ci-build.log
           echo "BUILD_EXIT=$BUILD_EXIT" >> $GITHUB_ENV
 
       - name: Save build log to repository (always)

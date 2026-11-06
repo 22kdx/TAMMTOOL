@@ -235,6 +235,9 @@ export NO_COLOR=1                                 # بدون ألوان (لقص�
 
 ## 4. التوقيع (Release / المتجر)
 
+> للإصدار الكامل (keystore لا يُفقد، Play App Signing، AAB، R8/`mapping.txt`، قائمة المتجر،
+> قوائم التحقق) اقرأ [`PLAY_STORE_RELEASE.md`](PLAY_STORE_RELEASE.md). هذا القسم = الحد الأدنى.
+
 بناء `release` بدون keystore يعطي `app-release-unsigned.apk` **لا يُثبَّت على جهاز**. للتوقيع:
 
 ```bash
@@ -407,5 +410,6 @@ gradle --stop                                       # إيقاف daemon المع
 * `TROUBLESHOOTING.md` — الأعراض → الأسباب → الحلول (بما فيها حالة CI الحالية)
 * `scripts/README.md` — مرجع أوامر السكربتات كاملاً
 * `AGENTS_STATUS.md` — حالة الفريق وما تم إنجازه
-* `TEAM_COLLABORATION.md` — ملاحظات متقاطعة على ملفات الوكلاء الآخرين
+* [`PLAY_STORE_RELEASE.md`](PLAY_STORE_RELEASE.md) — مسار النشر إلى Google Play (توقيع، AAB، R8، قائمة المتجر)
+* `TEAM_COLLABORATION.md` — ملاحظات متقاطعة على ملفات الوكلاء الآخرين (§0 = تسليم المنسّق)
 * `docs/workflow-*.md` — شرح سير عمل GitHub Actions (موجودة على فروع الفريق، ستصل مع الدمج)

@@ -39,7 +39,8 @@
 | 6 | `scripts/tests/mock-smoke.sh` | 89 فحصاً للسكربتَين بأدوات مزيفة في `/tmp` — بلا Android، بلا JDK، بلا إنترنت | `✓ كل الفحوص نجحت (89)`، وثلاث تشغيلات متتالية بنتيجة واحدة |
 | 7 | `.gitignore` | استثناء `dist/` و`build-logs/` و`test-reports/` و`screenshots/` و`local.properties` ومفاتيح التوقيع | — |
 | 8 | `scripts/ci-logs.sh` (جديد) | قراءة نتائج Actions عبر `api.github.com` فقط: خطوات الـ run، الـ annotations، أحجام الـ artifacts، وحكم «أخضر زيف» + `--gate` كبوابة CI + `--json` | **اختُبر على المستودع الحقيقي**: أظهر `Java heap space` لـ run `42264822833` ووصف run `42267633951` بالزيف (153B) — `--gate` يرجع 1 |
-| 9 | `build-apk.sh` v2.1 | إضافة قبول `TAMM_GRADLE_BIN=gradle` (اسم أمر، ليس مساراً) لتفادي توليد Wrapper في CI وتسريع التشغيل | shellcheck نظيف + mock-smoke 89/89 |
+| 9 | `PLAY_STORE_RELEASE.md` (جديد) | مسار النشر: قرار AAB/APK، توليد keystore وقواعد عدم فقدانه، `signingConfig` مقابل `sign-apk.sh`، R8 و`mapping.txt`، `versionCode`، جدول قائمة Play Console، جدولة أخطاء التوقيع، وقائمة تحقق قبل Publish | مبني على `apps/*/build.gradle.kts` (versionCode 1 · minify true · **بلا signingConfig**) و`scripts/sign-apk.sh`؛ لم يوقَّع ملف فعلياً هنا (لا `keytool`/`apksigner`) — موثّق في §9 منه |
+| 10 | `build-apk.sh` v2.1 | إضافة قبول `TAMM_GRADLE_BIN=gradle` (اسم أمر، ليس مساراً) لتفادي توليد Wrapper في CI وتسريع التشغيل | shellcheck نظيف + mock-smoke 89/89 |
 
 **الكوميتات:** `b0cea60` (السكربتات + `BUILD_GUIDE.md`) + كوميت التوثيق الحالي على `arena/68a3e358-tammtool`.
 
@@ -88,7 +89,9 @@
 6. **سؤالي لك:** هل تريد أن أُنشئ PR دمجاً من فرعك إلى `main` كـ diff مراجعة فقط (بدون تطبيق)،
    أم تبقى المراجعات نصاً في هذين الملفين؟ أجاهز لتجهيزه متى قلت «نعم».
 
-**الحالة: ✅ منجَز — بانتظار الدمج.**
+**الحالة: ✅ منجَز — بانتظار الدمج.** طلباتك في `AGENTS_STATUS.md` (فرع `6b69a15d`، `e05f5bc`)
+مؤدّاة كلها، والردّ التفصيلي تحت كل سؤال في `TEAM_COLLABORATION.md` §0.9، ومنشور جديد:
+[`PLAY_STORE_RELEASE.md`](PLAY_STORE_RELEASE.md) (keystore · AAB · R8/mapping · قائمة Play · قوائم تحقق).
 
 ---
 

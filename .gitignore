@@ -1,0 +1,57 @@
+# Android / Gradle
+*.apk
+*.aab
+*.apks
+*.keystore
+*.jks
+*.keys
+/local.properties
+/.gradle/
+/build/
+/app/build/
+*.iml
+.idea/
+*.iws
+*.ipr
+*.class
+*.jar
+*.war
+*.ear
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+*.swp
+*.swo
+~*
+
+# Fastlane
+/fastlane/report.xml
+/fastlane/Preview.html
+/fastlane/screenshots
+/fastlane/test_output
+
+# Firebase
+/.google-services.json
+
+# Secrets / environment
+.env
+.env.local
+*.secret
+
+# OS generated files
+*.log
+
+# Apps build outputs
+/apps/*/build/
+/apps/*/.gradle/
+/apps/*/local.properties

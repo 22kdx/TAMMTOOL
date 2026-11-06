@@ -63,7 +63,7 @@ jobs:
           from pathlib import Path
           log = Path("apps/marketer/ci-build.log")
           if log.exists():
-              lines = [line for line in log.read_text(errors="replace").splitlines() if line.startswith("e:") or "error:" in line or "What went wrong" in line or line.startswith("> ")]
+              lines = [line for line in log.read_text(errors="replace").splitlines() if line.startswith("e:") or "error:" in line or "What went wrong" in line or line.startswith("> ") or line.startswith("Plugin [") or line.startswith("Error resolving plugin")]
               for line in lines[:100]:
                   print("::error::" + line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))
           PYTHON

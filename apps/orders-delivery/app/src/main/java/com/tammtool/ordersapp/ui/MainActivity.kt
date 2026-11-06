@@ -12,7 +12,9 @@ import com.tammtool.ordersapp.ui.nav.AppNavGraph
 import com.tammtool.ordersapp.ui.theme.OrdersTheme
 import com.tammtool.ordersapp.ui.viewmodel.AuthViewModel
 import androidx.hilt.navigation.compose.hiltViewModel
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

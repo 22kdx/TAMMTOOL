@@ -104,7 +104,6 @@ kapt {
     correctErrorTypes = true
     arguments {
         arg("room.schemaLocation", "$projectDir/schemas")
-        arg("room.generateKotlin", "true")
     }
 }
 

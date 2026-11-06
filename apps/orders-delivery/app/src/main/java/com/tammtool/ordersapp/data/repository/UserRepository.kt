@@ -13,6 +13,7 @@ class UserRepository(private val userDao: UserDao) {
     suspend fun getById(id: Int): User? = userDao.getById(id)
     suspend fun getByPhone(phone: String): User? = userDao.getByPhone(phone)
     suspend fun countByRole(role: User.UserRole): Int = userDao.countByRole(role)
+    suspend fun count(): Int = userDao.count()
 
     fun getByRoleFlow(role: User.UserRole): Flow<List<User>> = userDao.getByRole(role)
     fun getAllActiveFlow(): Flow<List<User>> = userDao.getAllActive()

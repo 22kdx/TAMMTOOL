@@ -188,3 +188,37 @@ APK نهائي: لا شيء — كل artifacts آخر تشغيلات إما plac
 | 11 | تنظيف المانيفست: أذونات بلا كود + `dataExtractionRules` + قفل الاتجاه — §9.3/§9.4 | 1 | `aapt2 dump badging` يعرض الأذونات المستخدمة فقط |
 
 **لا يوجد أي عائق يمنع بدء 1 و2 اليوم** — لا يحتاجان JDK ولا جهاز، وكل ما فيهما نصّ جاهز في §0.
+
+---
+
+## تحديث 2026-11-06 (مساءً): الجدول أعلاه نُفِّذ أغلبه داخل `arena/68a3e358-tammtool`
+
+بعد توجيه «قم بحل كل المشاكل» انتقلت من «أُسلِّم رقعة» إلى «أُصلح في الشيفرة» على الفرع بعد دمجه مع
+فرع الكود `ff5110e8` (دمج `--no-ff`، 7 تعارضات حُلّت بإبقاء نسخة هذا الفرع في الملفات المشتركة).
+
+| # | المهمة الأصلية | الحالة الآن | ملاحظة |
+|---|---|---|---|
+| 1 | `jvmargs` في `apps/*/gradle.properties` | ✅ مطبَّق | من `patches/0002` + `kapt.workers.isolation=process` |
+| 2 | workflow بلا `set +e` + Gate + artifacts | ✅ مطبَّق | النسخة المقترحة صارت `.github/workflows/build-apk.yml` (12 خطوة، matrix، `unit-test`، بصمة حجم APK > 1MB) |
+| 3 | دمج `apps/` + `scripts/` + الوثائق | ✅ تم من هذا الفرع | `apps/{marketer,orders-delivery}` + `scripts/{android-sdk-setup,check-env,download-gradlew,sign-apk}.sh` صارت في فرع الوكيل 3 |
+| 4 | إصلاح `android-sdk-setup.sh:83` + `download-gradlew.sh` + `check-env.sh` | ✅ مطبَّق | syntax نظيف؛ 8.5 الثابتة → `$GRADLE_VERSION` (افتراضي 8.7)؛ فحص Wrapper لكل مشروع؛ فحص Java رقمي |
+| 5 | توحيد build-tools/Gradle | ⚠️ يحتاج `gradle-wrapper.jar` | السكربت جاهز، لكن التحميل محجوب هنا؛ ينفّذه 0 بأمر واحد (أسفل) |
+| 9 | `room.schemaLocation` (A1) | ✅ مطبَّق | `kapt {}` + `app/schemas/` + `androidTest.assets.srcDir` في التطبيقين |
+| 10 | تجزئة كلمة المرور (C1) | ✅ مطبَّق | `util/PasswordHasher.kt` + `login` يتحقق + `register` + `count()` + وضع أول تشغيل + 7 اختبارات وحدة لكل تطبيق |
+| 11 | تنظيف المانيفست (C3/C5/C6) | ✅ مطبَّق | أذونات ميتة محذوفة (2 فقط)، `backup_rules`/`data_extraction_rules`، `portrait` محذوف |
+| — | `signingConfig` من `keystore.properties` (B1) + versionCode من البيئة (B5) | ✅ مطبَّق | بلا keystore = نفس السلوك السابق (unsigned) بلا فشل جديد |
+| — | كلمات السر في `sign-apk.sh` (B3) | ✅ مطبَّق | `env:` + رفض بلا طرفية + `--print-certs` |
+| — | طبقة الشبكة (C2) والإشعارات (C4) | ⛔ قرار منتج | لا يُصلَح بصمت؛ التفاصيل في `GAP_TO_APK.md` §7 |
+| — | androidTest على جهاز + أيقونات PNG لـ orders + Coil/Timber غير مستخدمين (C7) | ⛔ جزئي | الاختبارات الوحدة أُضيفت؛ الباقي يحتاج محاكي (1) أو قرار إزالة التوابع |
+
+**أوامر التحقق التي أُجريت هنا (بلا JDK) — كلها خضراء:** `bash -n scripts/*.sh`،
+`bash scripts/tests/mock-smoke.sh` (89/89)، تحليل `xml.etree` للمانيفستات وملفات `res/xml`،
+`yaml.safe_load` للـ workflow (12 خطوة)، توازن أقواس كل ملف Kotlin معدل، ومحاكاة منطق صيغة
+PBKDF2 بسبع حالات (round‑trip/خطأ/نص صريح/ملح/تلاعب/حقول قصيرة/iterations ضعيفة).
+**لم يُجرَّب:** ترجمة Kotlin، تشغيل Gradle، توقيع، محاكي — لايزال الحكم لها لـ CI.
+
+```bash
+# ما على المنسّق 0 فعله فقط بعد الدمج (كل شيء آخر صار داخل الفرع)
+git merge --no-ff origin/arena/68a3e358-tammtool
+./scripts/download-gradlew.sh 8.7 && git add -f apps/*/gradlew apps/*/gradle/wrapper/*.jar && git commit -m "chore: gradle wrapper"
+```

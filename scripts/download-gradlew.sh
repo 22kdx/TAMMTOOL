@@ -15,8 +15,20 @@
 
 set -euo pipefail
 
-GRADLE_VERSION="${1:-8.5}"
+GRADLE_VERSION="${1:-8.7}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# اكتشاف كل مشروع Gradle (settings.gradle*) بدل قائمة يدوية بالتطبيقين
+discover_apps() {
+  local root dir
+  for root in apps examples projects templates; do
+    [[ -d "$PROJECT_ROOT/$root" ]] || continue
+    for dir in "$PROJECT_ROOT/$root"/*/; do
+      [[ -f "${dir}settings.gradle" || -f "${dir}settings.gradle.kts" ]] && printf '%s\n' "${dir%/}"
+    done
+  done
+  return 0
+}
 
 # ألوان للإخراج
 GREEN='\033[0;32m'
@@ -70,14 +82,15 @@ download_wrapper() {
     exit 1
   fi
 
-  # إعداد ملف الخصائص
-  log_info "إعداد gradle-wrapper.properties..."
-  cat > "$wrapper_dir/gradle-wrapper.properties" << 'EOF'
+  # إعداد الخصائص — كان هنا-نصاً مقبوساً يكتب 8.5 دائماً ويتجاهل وسيط النسخة (A3)
+  log_info "إعداد gradle-wrapper.properties (الإصدار $GRADLE_VERSION)..."
+  cat > "$wrapper_dir/gradle-wrapper.properties" <<EOF
 distributionBase=GRADLE_USER_HOME
 distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
+distributionUrl=https\://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip
 zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
+validateDistributionUrl=true
 EOF
 
   # إنشاء سكريبت gradlew (UNIX)
@@ -263,9 +276,18 @@ echo "============================================="
 echo "الإصدار: $GRADLE_VERSION"
 echo ""
 
-# تحميل للتطبيقين
-download_wrapper "$PROJECT_ROOT/apps/marketer"
-download_wrapper "$PROJECT_ROOT/apps/orders-delivery"
+# التطبيقان + أي مشروع مكتشف (examples/ و templates/ و projects/)
+count=0
+while IFS= read -r app_dir; do
+  [[ -n "$app_dir" ]] || continue
+  download_wrapper "$app_dir"
+  count=$((count + 1))
+done < <(discover_apps)
+
+if [[ "$count" -eq 0 ]]; then
+  log_error "لا مشروع Gradle (settings.gradle*) تحت apps/ أو examples/ أو projects/ أو templates/"
+  exit 1
+fi
 
 echo ""
 log_ok "اكتمل تحميل Gradle Wrapper لجميع التطبيقات."

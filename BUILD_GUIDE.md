@@ -158,6 +158,9 @@ export ANDROID_HOME="$HOME/android-sdk"          # إن لم يكن مضبوطا
 ./scripts/apk-test.sh test --app marketer         # ③ تثبيته وتشغيله على هاتفك
 ```
 
+* **قبل الاختبار على الجهاز:** قاعدة المستخدمين تبدأ **فارغة**، وصار التطبيقان يعرضان في أول
+  تشغيل نموذج «إنشاء أول حساب» (الاسم + الهاتف + كلمة المرور ≥ 8 أحرف) بدل شاشة دخول مستحيلة.
+  كلمة المرور تُخزَّن PBKDF2‑HMAC‑SHA256 بملح عشوائي (لا نصاً صريحاً) — راجع `TROUBLESHOOTING.md` §5.3.
 * أول بناء ينزّل الاعتماديات (~2–5GB) فقد يستغرق 10–25 دقيقة حسب الشبكة.
 * البناءات التالية ثوانٍ إلى دقائق قليلة.
 * الناتج النهائي يُنسخ تلقائياً إلى `dist/` باسم يحمل التطبيق والنوع والإصدار ورقم الـ commit،
@@ -173,6 +176,7 @@ dist/latest-marketer-debug.env
 
 | المطلوب | الأمر |
 |---|---|
+| اختبارات الوحدة (منطق التجزئة/الصيغة) | `./scripts/build-apk.sh unit-test marketer` |
 | Debug APK | `./scripts/build-apk.sh debug marketer` |
 | Release APK | `./scripts/build-apk.sh release marketer` |
 | AAB (للمتجر) | `./scripts/build-apk.sh bundle marketer` |
@@ -237,6 +241,23 @@ export NO_COLOR=1                                 # بدون ألوان (لقص�
 
 > للإصدار الكامل (keystore لا يُفقد، Play App Signing، AAB، R8/`mapping.txt`، قائمة المتجر،
 > قوائم التحقق) اقرأ [`PLAY_STORE_RELEASE.md`](PLAY_STORE_RELEASE.md). هذا القسم = الحد الأدنى.
+
+> **من هذا الفرع (2026‑11‑06 مساءً):** `apps/<app>/app/build.gradle.kts` يقرأ `keystore.properties`
+> من **جذر المستودع** إن وُجد ويضبط `signingConfig` لنسخة release تلقائياً ⇒ `assembleRelease`
+> يعطي ملفاً موقَّعاً باسم `app-release.apk` بلا خطوة توقيع منفصلة. الملف غير مرفوع في git
+> (وقبل إنشائه اقرأ سياسة النسخ في `PLAY_STORE_RELEASE.md` §2). دونه يبقى السلوك القديم:
+> `app-release-unsigned.apk` — لا فشل، لا توقيع. الصيغة المطلوبة:
+>
+> ```properties
+> # keystore.properties (في الجذر — لا ترفعه أبداً)
+> storeFile=../keystore/release.jks
+> storePassword=…
+> keyAlias=release-key
+> keyPassword=…
+> ```
+>
+> و`versionCode`/`versionName` أصبحا يُقرأان من البيئة (`TAMM_VERSION_CODE` / `TAMM_VERSION_NAME`،
+> افتراضهما `1` و`1.0.0`)؛ الـ CI يضبط versionCode على `github.run_number` لضمان التتابع على Play.
 
 بناء `release` بدون keystore يعطي `app-release-unsigned.apk` **لا يُثبَّت على جهاز**. للتوقيع:
 
@@ -318,15 +339,25 @@ adb wait-for-device
 
 ## 6. البناء عبر GitHub Actions
 
-### 6.1 الحالي
+### 6.1 الحالي (نسخة هذا الفرع — 12 خطوة، matrix للتطبيقين)
 
-الملف `.github/workflows/build-apk.yml` (على فروع العمل) يقوم بـ:
+الملف `.github/workflows/build-apk.yml` يقوم بـ:
 
-1. `setup-java` JDK 17 (temurin)
-2. تثبيت Android SDK يدوياً بـ curl (`platform-tools` + `platforms;android-35` + `build-tools;34.0.0`)
-3. `gradle/actions/setup-gradle@v4` بالإصدار **8.7**
-4. `gradle :app:assembleDebug` داخل `apps/marketer` مع `tee ci-build.log`
-5. رفع `ci-build.log` و `app-debug.apk` كـ artifacts
+1. `checkout` ثم `setup-java` JDK 17 (temurin)
+2. `./scripts/android-sdk-setup.sh --sdk-dir "$ANDROID_HOME" --accept-licenses` (نفس مسار المحلي)
+3. `gradle/actions/setup-gradle@v4` بالإصدار **8.7** + `TAMM_GRADLE_BIN: gradle`
+4. **`bash scripts/tests/mock-smoke.sh`** — اختبار أدوات البناء قبل البناء نفسه
+5. `./scripts/build-apk.sh debug <app> --no-daemon --yes` (نفس الكود محلياً وCI)
+6. `./scripts/apk-test.sh validate --app <app>` (فحص ثابت بلا محاكي)
+7. `./scripts/build-apk.sh unit-test <app>` — اختبارات الوحدة (بعد البناء لتفادي kapt مرتين على باردة)
+8. **بوّابة «APK حقيقي»:** يفشل الـ job إن لم يوجد `dist/*.apk` أكبر من 1MB — نهاية «الأخضر الزائف»
+9. خطوة `if: always()` تذيّل السجل وتحوّل `* What went wrong:` / `e:` / `heap space` إلى `::error::` annotations
+10. رفع `dist/*.apk` بـ `if-no-files-found: error` (لا `no-apk.txt`)
+11. رفع `build-logs/` كـ artifact للسجل الكامل (لا `git add` لمجلد محظور بـ `.gitignore`)
+12. `concurrency` بلا إلغاء + `timeout-minutes: 45` + `permissions: contents: read` (لا كتابة على الفرع)
+
+المتغيرات المضبوطة في البيئة: `ANDROID_HOME`، `TAMM_GRADLE_BIN=gradle`، `TAMM_VERSION_CODE=${{ github.run_number }}`،
+`TAMM_VERSION_NAME=1.0.0-ci.<run>`. للتحقق من صحة YAML: `python3 -c "import yaml;print(len(yaml.safe_load(open('.github/workflows/build-apk.yml'))['jobs']['build']['steps']))"`.
 
 ### 6.1.1 فخ «الأخضر الزائف» (اقرأ هذا قبل أن تحتفل)
 

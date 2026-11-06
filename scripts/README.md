@@ -201,9 +201,13 @@ KEYSTORE_PASSWORD='…' KEY_PASSWORD='…' \
 
 * ينفّذ `cd` إلى جذر المستودع، فاستخدم مسارات مطلقة أو نسبةً إلى الجذر.
 * المخرج الافتراضي: `<input>-signed.apk`.
-* ⚠ ملاحظتان (مفتوحتان، يملكهما الوكيل 2): كلمات المرور تمرر بـ `pass:…` (مرئية في `ps`)،
-  وطلبها بـ `read -rp` يفشل في الطرفيات غير التفاعلية. التوثيق الموسّع في
-  `../docs/workflow-sign-apk.md` (على فروع الفريق).
+* **الأمان (مُصلَح في `arena/68a3e358` · 2026‑11‑06):** كلمات المرور تُمرَّر الآن بـ
+  `--ks-pass env:KEYSTORE_PASSWORD` / `--key-pass env:KEY_PASSWORD` فلا تظهر في `ps` ولا في سجل CI؛
+  ولا يسأل السكربت إطلاقاً بلا طرفية — بل يرفض برسالة «اضبط KEYSTORE_PASSWORD في البيئة» (لم يكن
+  `read -rp` يعلّق في CI فحسب، بل كان يُخرج كلمة المرور إلى سجل الخطوة أحياناً).
+* بعد التوقيع يطبع `apksigner verify --verbose --print-certs` (بصمة SHA‑1/SHA‑256 التي تقارنها في
+  Play Console ← App signing) ويفحص `zipalign -c` إن وُجدت الأداة.
+* التوثيق الموسّع: [`../docs/workflow-sign-apk.md`](../docs/workflow-sign-apk.md).
 
 ---
 
@@ -214,11 +218,19 @@ KEYSTORE_PASSWORD='…' KEY_PASSWORD='…' \
 ./scripts/download-gradlew.sh 8.7         # يولّد gradlew/gradlew.bat + gradle-wrapper.*
 ```
 
-* `check-env.sh` يبحث عن `./gradlew` في **جذر المستودع**؛ وبما أن كل تطبيق مشروع مستقل،
-  فالنتيجة الطبيعية «Wrapper غير موجود» — الأنسب استخدام `./scripts/build-apk.sh --print-env`.
-* `download-gradlew.sh` يكتب `distributionUrl` ثابتاً على Gradle 8.5 بغضّ النظر عن الوسائط —
-  راجع `../TROUBLESHOOTING.md` §9؛ والأأمن: `./scripts/build-apk.sh debug --yes` (يولّد Wrapper
-  بالإصدار الصحيح من `gradle wrapper`).
+* `check-env.sh` (مُحدَّث) يفحص Wrapper **لكل مشروع** (`apps/*`, `examples/*`, `projects/*`,
+  `templates/*`) لا في جذر المستودع، ويفحص رقم Java رقمياً (JDK `11.0.17` كان يُحسب 17 ويُمرَّر)،
+  ويخرج rc=1 عند الفشل. النتيجة المتوقعة اليوم: `فشل: 7` كلها «لا wrapper» حتى ترفعه — وهذا هو
+  المقصود، لا تستبدله بـ «تحذير» أخضر. للمقارنة السريعة: `./scripts/build-apk.sh --print-env`.
+* `download-gradlew.sh` صار يحترم وسيط النسخة (كان `distributionUrl` مكتوباً 8.5 دائماً) واشتق
+  المشاريع آلياً؛ الافتراضي **8.7** لمطابقة AGP 8.6:
+
+  ```bash
+  ./scripts/download-gradlew.sh 8.7
+  git add -f apps/*/gradlew apps/*/gradle/wrapper/*.jar   # الـ jar يحتاج -f (ليس محذوفاً في .gitignore بل غير مضاف)
+  ```
+  إن لم تكن الشبكة متاحة (كما في بيئة التوثيق) فالبديل الآمن: `./scripts/build-apk.sh debug --yes`
+  يولّد Wrapper من `gradle` النظام بالإصدار الصحيح.
 
 ---
 
@@ -231,10 +243,14 @@ KEYSTORE_PASSWORD='…' KEY_PASSWORD='…' \
 يحمّل Command-line Tools من Google (Linux/macOS)، يقبل التراخيص، ويثبّت
 `platform-tools` + `platforms;android-35` + `build-tools;35.0.0`.
 
-**⚠ حالة معروفة (مفتوحة):** في الفروع الحالية السطر 83 يحتوي بقايا دمج
-(`<<<<>>> echo …`) فيفشل `bash -n` ويُعطّل السكربت كله. `build-apk.sh --setup-sdk`
-يكتشف ذلك ويثبّت SDK داخلياً بدلاً منه، أو استخدم أوامر التثبيت اليدوي في
+**✅ الحالة (2026‑11‑06):** السطر 83 الذي كان يحوي بقايا دمج `<<<<>>> echo …` (خطأ صيغة يُعطّل
+السكربت كله — وكان CI يناديه!) أُصلح في `arena/68a3e358` مع تعليق كوري وعربّي مكسورين؛ `bash -n`
+نظيف والوسيطان `--sdk-dir` / `--accept-licenses` موجودان فعلاً ويستخدمهما الـ workflow.
+`build-apk.sh --setup-sdk` يظل يثبّت SDK داخلياً عند تعذر السكربت، والتثبيت اليدوي في
 [`../BUILD_GUIDE.md`](../BUILD_GUIDE.md) §2.7.
+
+**يبقى مفتوحاً:** يثبّت `build-tools;35.0.0` بينما كان CI القديم يثبّت `34.0.0` — AGP 8.6 يعمل
+مع كليهما، لكن وحّدهما برقم واحد (قرار المنسّق 0 مع `gradle-wrapper.properties`).
 
 ---
 

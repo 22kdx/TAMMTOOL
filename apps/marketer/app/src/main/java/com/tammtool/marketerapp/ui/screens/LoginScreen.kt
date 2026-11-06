@@ -25,11 +25,18 @@ fun LoginScreen(
 ) {
     var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var fullName by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
 
     val loading by authViewModel.loading.observeAsState(false)
     val error by authViewModel.error.observeAsState()
     val user by authViewModel.user.observeAsState()
+    val noAccounts by authViewModel.noAccounts.observeAsState(false)
+    // أول تشغيل (قاعدة المستخدمين فارغة) ⇒ نفس الحقول تُستخدم لإنشاء الحساب بدل دخولٍ مستحيل
+    var registerMode by remember { mutableStateOf(false) }
+    val isFirstRun = noAccounts && registerMode
+
+    LaunchedEffect(Unit) { authViewModel.refreshFirstRunState() }
 
     if (user != null) {
         onLoginSuccess()
@@ -55,6 +62,17 @@ fun LoginScreen(
         )
 
         Spacer(modifier = Modifier.height(32.dp))
+
+        if (isFirstRun) {
+            OutlinedTextField(
+                value = fullName,
+                onValueChange = { fullName = it },
+                label = { Text("الاسم الكامل") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         OutlinedTextField(
             value = phone,
@@ -103,14 +121,28 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         Button(
-            onClick = { authViewModel.login(phone, password) },
-            enabled = !loading && phone.isNotEmpty() && password.isNotEmpty(),
+            onClick = {
+                if (isFirstRun) authViewModel.register(fullName, phone, password)
+                else authViewModel.login(phone, password)
+            },
+            enabled = !loading && phone.isNotEmpty() && password.isNotEmpty() &&
+                (!isFirstRun || fullName.isNotEmpty()),
             modifier = Modifier.fillMaxWidth()
         ) {
             if (loading) {
                 CircularProgressIndicator(modifier = Modifier.size(20.dp))
             } else {
-                Text("تسجيل الدخول")
+                Text(if (isFirstRun) "إنشاء الحساب والدخول" else "تسجيل الدخول")
+            }
+        }
+
+        if (noAccounts && !registerMode) {
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = { registerMode = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("لا يوجد حساب بعد — إنشاء أول حساب")
             }
         }
 

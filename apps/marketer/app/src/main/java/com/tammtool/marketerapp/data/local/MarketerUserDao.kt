@@ -23,4 +23,8 @@ interface MarketerUserDao {
 
     @Query("SELECT * FROM marketer_users WHERE is_active = 1")
     fun getActiveUser(): Flow<MarketerUser?>
+
+    // أول تشغيل: إن لم يوجد أي حساب يعرض LoginScreen نموذج إنشاء الحساب (بدون هذا يبقي login مستحيلاً)
+    @Query("SELECT COUNT(*) FROM marketer_users")
+    suspend fun count(): Int
 }

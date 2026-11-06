@@ -25,6 +25,10 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE phone = :phone")
     suspend fun getByPhone(phone: String): User?
 
+    // أول تشغيل: قاعدة بلا مستخدمين ⇒ الشاشة تنتقل إلى وضع إنشاء الحساب
+    @Query("SELECT COUNT(*) FROM users")
+    suspend fun count(): Int
+
     @Query("SELECT * FROM users WHERE role = :role AND is_active = 1")
     fun getByRole(role: User.UserRole): Flow<List<User>>
 

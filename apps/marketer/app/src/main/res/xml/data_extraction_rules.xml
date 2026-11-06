@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- C5 (GAP_TO_APK.md): API 31+ — نفس استثناءات النسخ السحابي تنطبق على النقل من جهاز إلى جهاز.
+     استثناء قاعدة Room يمنع تسريب كلمات المرور/الموقع/البيانات المالية عبر backup. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="database" path="marketer_app_db" />
+        <exclude domain="database" path="marketer_app_db-journal" />
+        <exclude domain="database" path="marketer_app_db-wal" />
+        <exclude domain="database" path="marketer_app_db-shm" />
+        <exclude domain="sharedpref" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="database" path="marketer_app_db" />
+        <exclude domain="database" path="marketer_app_db-journal" />
+        <exclude domain="database" path="marketer_app_db-wal" />
+        <exclude domain="sharedpref" path="." />
+    </device-transfer>
+</data-extraction-rules>

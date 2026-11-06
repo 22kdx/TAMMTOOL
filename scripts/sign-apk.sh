@@ -51,29 +51,51 @@ echo " TAMMTOOL - توقيع ملف APK"
  echo "الأداة:        $APKSIGNER"
  echo ""
 
-# طلب كلمة المرور بشكل آمن إذا لم تكن مضبوطة كمتغير بيئة
+# ── كلمات المرور: من البيئة، أو تفاعلياً عند وجود طرفية فقط ─────────────────
+# (B3 في GAP_TO_APK.md) كان pass:… يمرَّر في سطر الأوامر فيُرى في ps/سجل CI،
+# وكان read -rsp يعلّق في CI أو الأنابيب. الآن env: + رفض صريح بلا طرفية.
 if [[ -z "${KEYSTORE_PASSWORD:-}" ]]; then
-  read -rsp "أدخل كلمة مرور keystore: " KEYSTORE_PASSWORD
-  echo ""
+  if [[ -t 0 ]]; then
+    read -rsp "أدخل كلمة مرور keystore: " KEYSTORE_PASSWORD; echo ""
+  else
+    echo "خطأ: اضبط KEYSTORE_PASSWORD في البيئة (CI/الأنابيب بلا طرفية)." >&2
+    exit 1
+  fi
 fi
 if [[ -z "${KEY_PASSWORD:-}" ]]; then
-  read -rsp "أدخل كلمة مرور المفتاح (key password): " KEY_PASSWORD
-  echo ""
+  if [[ -t 0 ]]; then
+    read -rsp "أدخل كلمة مرور المفتاح (key password): " KEY_PASSWORD; echo ""
+  else
+    echo "خطأ: اضبط KEY_PASSWORD في البيئة (CI/الأنابيب بلا طرفية)." >&2
+    exit 1
+  fi
 fi
+export KEYSTORE_PASSWORD KEY_PASSWORD
 
 # التوقيع
+# التوقيع — env: بدل pass: فلا تظهر كلمات المرور في قائمة العمليات
 "$APKSIGNER" sign --ks "$KEYSTORE" --ks-key-alias "$KEY_ALIAS" \
-  --ks-pass "pass:$KEYSTORE_PASSWORD" \
-  --key-pass "pass:$KEY_PASSWORD" \
+  --ks-pass env:KEYSTORE_PASSWORD \
+  --key-pass env:KEY_PASSWORD \
   --out "$OUTPUT_APK" "$INPUT_APK"
 
 echo ""
 echo "تم التوقيع بنجاح!"
 echo "ملف APK الموقّع: $OUTPUT_APK"
 
-# التحقق من التوقيع
+# التحقق من التوقيع + بصمة SHA-256 (قارنها بـ Play Console → App signing / upload key)
 echo "جاري التحقق من التوقيع..."
-"$APKSIGNER" verify --verbose "$OUTPUT_APK"
+"$APKSIGNER" verify --verbose --print-certs "$OUTPUT_APK"
+
+# فحص المحاذاة إن وُجدت zipalign (apksigner يشترط محاذاة صحيحة في الأدوات الأقدم)
+ZIPALIGN=""
+if [[ -n "${ANDROID_HOME:-}" ]]; then
+  ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -name zipalign -type f 2>/dev/null | sort | tail -n 1 || true)"
+fi
+if [[ -n "${ZIPALIGN:-}" && -x "$ZIPALIGN" ]]; then
+  "$ZIPALIGN" -c -v 4 "$OUTPUT_APK" >/dev/null 2>&1 \
+    || echo "تحذير: الملف غير محاذى — نفّذ: zipalign -f 4 <in> $OUTPUT_APK ثم أعد التوقيع."
+fi
 
 echo ""
 echo "الملف جاهز للتثبيت أو النشر على Google Play."

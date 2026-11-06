@@ -80,7 +80,7 @@ echo "============================================="
 echo "مسار التثبيت: $ANDROID_HOME"
 echo "إصدار أدوات سطر الأوامر: $CMDLINE_TOOLS_VERSION"
 echo "النظام الأساسي: $PLATFORM_VERSION"
-<<<<>>> echo "أدوات البناء: $BUILD_TOOLS_VERSION"
+echo "أدوات البناء: $BUILD_TOOLS_VERSION"
 echo ""
 
 # ============================================================
@@ -178,8 +178,8 @@ mkdir -p "$TEMP_DIR"
 
 unzip -q -o "$ZIP_PATH" -d "$TEMP_DIR"
 
-# 명령라인 tools يأتي ضمن مجلد cmdline-tools داخل الـ zip
-# ننقل محتوياته إلى latest
+# تأتي أدوات سطر الأوامر داخل مجلد cmdline-tools داخل الـ zip،
+# فننقل محتوياته إلى latest
 if [[ -d "$TEMP_DIR/cmdline-tools" ]]; then
   mv "$TEMP_DIR/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
 else
@@ -222,7 +222,7 @@ echo "الحزم: $PACKAGES"
 for package in $PACKAGES; do
   log_info "جاري تثبيت: $package"
   if ! yes | sdkmanager "$package" > /dev/null 2>&1; then
-    log_warn "فشل تثبيت $package عبر síesno، نحاول قبول الترخيص تلقائياً..."
+    log_warn "فشل تثبيت $package عبر sdkmanager، نحاول قبول الترخيص تلقائياً..."
     echo "y" | sdkmanager "$package" || true
   fi
 done

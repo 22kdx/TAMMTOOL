@@ -1,17 +1,30 @@
-# Add project specific ProGuard rules here.
-# By default, the flags in this file are appended to flags specified
-# in app/build.gradle.kts. You can edit this file to customize which
-# classes are kept or obfuscated.
+# ── TAMMTOOL — قواعد R8/ProGuard ─────────────────────────────────────────────
+# كانت القاعدة الوحيدة «-keep class com.tammtool.** { *; }» ⇒ كل كود التطبيق مستثنى من
+# التقليص، أي minify=true بلا فائدة فعلية. القواعد الآن أضيق، مع مِظلّة في الأسفل تُبقي
+# السلوك القديم إلى أن يُختبر التقليص على جهاز حقيقي (احذفها حينها).
 
--keep class com.tammtool.ordersapp.** { *; }
--dontwarn androidx.**
--dontwarn com.google.android.material.**
--dontwarn kotlinx.serialization.**
+-keepattributes Signature,InnerClasses,EnclosingMethod,*Annotation*,Exceptions,SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# Room — تنفيذ الـ DAO والمولّد من kapt
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keep @androidx.room.Entity class * { *; }
+-dontwarn androidx.room.paging.**
+
+# Hilt / Dagger
 -dontwarn dagger.**
--dontwarn androidx.hilt.**
--keepnames class * implements android.os.Parcelable
--keepclassmembers class * implements android.os.Parcelable {
-    public static final android.os.Parcelable$Creator *;
-}
--keep class androidx.lifecycle.ViewModel { *; }
--keep class com.tammtool.ordersapp.data.model.** { *; }
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**
+
+# kotlinx.serialization — يحفظ الـ serializer المولّد لكل @Serializable
+-dontnote kotlinx.serialization.**
+-keepclassmembers class kotlinx.serialization.json.** { *** Companion; }
+-keepclassmembers class com.tammtool.** { *** Companion; }
+-keep,includedescriptorclasses class com.tammtool.**$$serializer { *; }
+
+# Compose — مرجع دوال التركيب لا يُقلَّص
+-keep class androidx.compose.runtime.** { *; }
+-dontwarn androidx.**
+
+# مِظلّة أمان مؤقتة (S4 في GAP_TO_APK.md): احذفها لتفعيل التقليص فعلاً
+-keep class com.tammtool.** { *; }

@@ -5,6 +5,10 @@
 > `origin/arena/6b69a15d-tammtool` @ `74f0a54`. كل سطر فيه **أمر يثبتُه** و**سطر يُصلحه**.
 > لم يُنفَّذ أي بناء Gradle في بيئة العمل (لا JDK/SDK/شبكة) — ما لم أتحقق منه مذكور في §6.
 
+> **تحديث 2026-11-06 (لاحق):** بعد «قم بحل كل المشاكل» نُفِّذت الإصلاحات **في الكود داخل هذا
+> الفرع** (`arena/68a3e358-tammtool` @ ما بعد الدمج مع `ff5110e8`)، ولم تعد `patches/` هي المصدر
+> الوحيد. جدول الحالة بند‑بند مع أمر التحقق من كل إصلاح: **§7 في نهاية الملف**.
+
 **الحالة بكلمة:** التطبيقان **مبنيان محلياً منطقياً** (UI + Room + Hilt كاملان، 36 و62 ملف Kotlin،
 بلا ملفات فارغة)، لكن **لا يوجد APK** لأن: (1) CI يخفي الفشل، (2) ذاكرة Gradle، (3) **عائق لم
 يذكره أحد بعد: `room.schemaLocation`**، (4) لا wrapper في git، ولا keystore. وبعدها تأتي فجوات
@@ -211,6 +215,51 @@ DAO واحد + اختبار ViewModel لتسجيل الدخول (يمنع C1 م�
   الفحص الحقيقي يحدث في `processDebugResources` عند أول بناء.
 - لم أراجع `apps/` على `6b69a15d` إلا لإثبات أنها **أقدم/أكثر كسراً** من `ff5110e8` (الأخطاء
   الأربعة ما تزال هناك)؛ لا تعتبر هذا حكماً على كود الوكيل 1 في فرعه.
+
+---
+
+## 7. الحالة بعد التنفيذ — ما أُصلح فعلاً في `arena/68a3e358-tammtool`
+
+«مُطبَّق» = التعديل في الشيفرة + كل ما يمكن التحقق منه بلا Gradle (بناء `bash -n`، تحليل XML/YAML،
+`git diff --check`، `scripts/tests/mock-smoke.sh` 89/89، توازن أقواس Kotlin، ومحاكاة منطق التجزئة في Python).
+«لا يزال» = يحتاج Gradle/شبكة/قرار منتج لا يملكه هذا الفرع.
+
+| البند | الحالة | ما تم بالضبط | كيف تتحقق |
+|---|---|---|---|
+| **A1** مخطط Room | ✅ مُطبَّق | `kapt { room.schemaLocation }` + `app/schemas/` في التطبيقين + `androidTest.assets.srcDir` ليقرأ `MigrationTestHelper` المخططات المرفوعة | `grep -n schemaLocation apps/*/app/build.gradle.kts` |
+| **A2** ذاكرة Gradle | ✅ مُطبَّق (سابقاً) | `org.gradle.jvmargs=-Xmx3g` + `kotlin.daemon.jvm.options=-Xmx1536m` + `kapt.workers.isolation=process` في `apps/*/gradle.properties` | `grep -n jvmargs apps/*/gradle.properties` |
+| **A3** الـ Wrapper | ⚠️ جزئي | `download-gradlew.sh` صار يحترم وسيط النسخة (كان يكتب 8.5 دائماً)، افتراضيه 8.7، واكتشاف المشاريع آلياً (4 مشاريع مُختبَرة هنا). **`gradle-wrapper.jar` لا يزال غير مرفوع** — التحميل من `services.gradle.org` محجوب في هذه البيئة | `bash scripts/download-gradlew.sh 8.7 --dry-run` + `git ls-files apps/*/*/gradle/wrapper` |
+| **A4** CI الأخضر الزائف | ✅ مُطبَّق | `.github/workflows/build-apk.yml` استُبدل بالنسخة المقترحة: 12 خطوة، matrix للتطبيقين، **بوّابة «APK حقيقي > 1MB»**، رفع السجل كـ artifact (لا `git add`)، `annotations` من `* What went wrong:`، بلا `contents: write` | `python3 -c "import yaml;d=yaml.safe_load(open('.github/workflows/build-apk.yml'));print(len(d['jobs']['build']['steps']))"` → 12 |
+| **A5** `android-sdk-setup.sh` | ✅ مُطبَّق | السطر 83 `<<<<>>> echo …` → `echo …`؛ معلق كوري → عربي؛ «síesno» → «sdkmanager». `bash -n` نظيف | `bash -n scripts/android-sdk-setup.sh` |
+| **B1** توقيع الإصدار | ✅ مُطبَّق | `signingConfigs.create("release")` يُبنى فقط إن وُجد `keystore.properties` في الجذر، و`release` يشير إليه — بدونه يبقى السلوك القديم (ملف غير موقّع) بلا فشل جديد | `grep -n signingConfig apps/marketer/app/build.gradle.kts` |
+| **B2** سياسة keystore | ✅ موثَّقة | `keystore.properties` مقبول (والـ Gradle يقرأه) + سياسة عدم الرفع والنسخ في `PLAY_STORE_RELEASE.md` §2؛ التوليد بـ keytool موصوف هناك | `ls keystore.properties 2>&1` (يجب ألا يكون مرفوعاً) |
+| **B3** كلمات السر في argv | ✅ مُطبَّق | `sign-apk.sh`: `env:KEYSTORE_PASSWORD` بدل `pass:…`، ورفض صريح بلا طرفية (`[[ -t 0 ]]`) بدل تعليق `read`، + `apksigner verify --print-certs` وبصمة SHA‑256 + فحص `zipalign -c` | `grep -n "env:KEY" scripts/sign-apk.sh` |
+| **B4** R8 | ⚠️ جزئي | قواعد `proguard-rules.pro` صارت نطاقاً أدق (Room/Hilt/serialization/Compose) بدل keep الشامل، مع `*Annotation*,SourceFile` و`-renamesourcefileattribute` ومِظلّة `-keep class com.tammtool.** { *; }` في النهاية قابلة للحذف. **الاحتفاظ بـ `mapping.txt` لكل إصدار ما يزال خطوة يدوية** (مسارها مذكور في `PLAY_STORE_RELEASE.md`) | `grep -c "^[[:space:]]*#" apps/marketer/app/proguard-rules.pro` |
+| **B5** versionCode | ✅ مُطبَّق | `versionCode = System.getenv("TAMM_VERSION_CODE")?.toIntOrNull() ?: 1` ونفس الشيء لاسم النسخة، والـ CI يضبطهما من `github.run_number` ⇒ تسلسل monotonic تلقائي | `grep -n ciVersionCode apps/*/app/build.gradle.kts` |
+| **C1** كلمة المرور لا تُتحقق | ✅ مُطبَّق | `util/PasswordHasher.kt` (PBKDF2‑HMAC‑SHA256، 120k تكرار، ملح 16 بايت، صيغة `pbkdf2:<alg>:<iter>$salt$hash`، `MessageDigest.isEqual`)؛ `login()` صار يتحقق ويرقّي المفتاح القديم؛ `register()` في التطبيقين؛ `count()` في DAO/Repository؛ أول تشغيل ينقل الشاشة لنموذج إنشاء الحساب؛ زر «إنشاء حساب جديد» المعطّل في orders فُعِّل؛ **9 فحوص وحدة لكل تطبيق** في `src/test/java` (`PasswordHasherTest`) | `ls apps/*/app/src/test -R \| head` + `python3 -` (محاكاة الصيغة في Python: 7 حالات نجحت) |
+| **C2** لا طبقة شبكة | ⛔ لا يزال | قرار منتج: MVP محلي أم نقطة نهاية؟ لا يمكن «حلّه» بكتابة عميل عشوائي. المطلوب من 0+1: حقل `base_url` في `gradle.properties` + Retrofit/OkHttp أو Ktor، وإلا ابقِه محلياً وصرّح بذلك في نموذج «أمان البيانات» | `git grep -l "Retrofit\|OkHttp" -- apps` |
+| **C3** أذونات ميتة | ✅ مُطبَّق | حُذفت `RECEIVE_SMS`/`SEND_SMS`/`WAKE_LOCK`/`FOREGROUND_SERVICE`/`VIBRATE` من المانيفستين مع تعليق يشرح ما يلزم إعادتها (Receiver + إقرار سياسة SMS / `<service>` + `foregroundServiceType` + `POST_NOTIFICATIONS`) | `grep -c uses-permission apps/*/app/src/main/AndroidManifest.xml` → 2 |
+| **C4** الإشعارات | ⛔ لا يزال (قرار) | لا يوجد أي كود إشعارات؛ إضافته تعني `POST_NOTIFICATIONS` + طلب وقت التشغيل + `NotificationChannel` ⇒ خارج «إصلاح عيب» وتدخل في «ميزة جديدة». الجداول في Room جاهزة كطابور؛ الإمساك الحقيقي يحتاج FCM/WorkManager | `git grep -l NotificationManager -- apps` → لا نتيجة |
+| **C5** النسخ الاحتياطي | ✅ مُطبَّق | `res/xml/backup_rules.xml` + `data_extraction_rules.xml` في التطبيقين تستثني `*_app_db`/`*_delivery_db` ومذكراتها و`sharedpref`، مع `fullBackupContent` (≤30) و`dataExtractionRules` (31+) | `python3 -c "import xml.etree.ElementTree as E;E.parse('apps/marketer/app/src/main/res/xml/data_extraction_rules.xml')"` |
+| **C6** قفل الاتجاه | ✅ مُطبَّق | أُزيل `android:screenOrientation="portrait"` من `MainActivity` (تعارض targetSdk 35 مع سياسة الشاشات الكبيرة). إن أردت القفل فافعله عبر `WindowSizeClass` أو اطلب إعفاءً في Console | `grep -c screenOrientation apps/*/app/src/main/AndroidManifest.xml` → 0 |
+| **C7** الاختبارات/التوابع | ⚠️ جزئي | صارت هناك اختبارات وحدة فعلية (ملف في كل تطبيق، 9 فحوص: منطق التجزئة/الصيغة/الرفض) + `testInstrumentationRunner` + توابع junit/espresso/coroutines-test + خطوة `unit-test` في CI. **لم يُضَف** `androidTest` على جهاز، وCoil (في orders) وTimber (في التطبيقين) ما يزالان معلَّنين بلا استخدام، وأيقونة orders ما تزال vector فقط | `find apps/*/app/src/test -name "*.kt" \| wc -l` → 2 |
+| `check-env.sh` | ✅ محسَّن | فحص Java رقمياً (`17.0.2`→17، و`11.0.17`→11 — كان `grep -E '17\|21'` يمرّر JDK 11)، وفحص Wrapper **لكل مشروع** مع رسالة الإصلاح، وألوان الملخص بـ `echo -e` | `bash scripts/check-env.sh` (يفشل 7 ويذكر الأوامر) |
+
+**ما لم يتغيّر رغم إمكانية إصلاحه هنا (عمداً، بانتظار صاحب القرار):** C2 (طبقة الشبكة)، C4 (الإشعارات)،
+رفع `gradle-wrapper.jar` (شبكة محجوبة)، توليد keystore حقيقي (لا يُخزَّن في git أصلاً)، أي تأكيد
+أن `assembleDebug` يمرّ — هذا كله للمنسّق 0 في CI، و**الآن بعد الدمج لا تُطبَّق `patches/0001..0003`
+على هذا الفرع** لأنها صارت داخل الشيفرة (راجع `patches/README.md`).
+
+**ترتيب التشغيل عند المنسّق 0 بعد الدمج:**
+
+```bash
+git fetch origin && git merge --no-ff origin/arena/68a3e358-tammtool
+bash scripts/check-env.sh                      # يجب أن يفشل بفقرتي wrapper فقط
+bash scripts/tests/mock-smoke.sh | tail -2     # 89/89
+./scripts/download-gradlew.sh 8.7              # ينشئ gradlew لكل مشروع مُكتشَف
+git add -f apps/*/gradle/wrapper/gradle-wrapper.jar apps/*/gradlew && git commit -m "chore: add gradle wrapper"
+gh run watch                                   # الآن الفشل الحقيقي يظهر، لا «نجاح» فارغ
+```
 
 **أوامر إعادة إنتاج هذا الملف كله (بلا JDK):**
 

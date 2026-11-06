@@ -10,4 +10,5 @@ class MarketerUserRepository(private val userDao: MarketerUserDao) {
     suspend fun getByPhone(phone: String): MarketerUser? = userDao.getByPhone(phone)
     suspend fun getById(id: Int): MarketerUser? = userDao.getById(id)
     fun getActiveUserFlow(): Flow<MarketerUser?> = userDao.getActiveUser()
+    suspend fun count(): Int = userDao.count()
 }

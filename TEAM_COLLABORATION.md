@@ -594,3 +594,59 @@ arg("room.schemaLocation", …) } }` في أي `build.gradle.kts`، ولا مج�
   (`git grep -l "Timber\|coil" … -- apps/*/src` → فارغ)؛ وحذفهما يُنقص الحجم والهجوم السطحي.
 * `src/test` و`src/androidTest` = **0 ملف** في التطبيقين ⇒ لا شيء يمنع C1 من العودة بعد إصلاحه؛
   أقل نافع: اختبار ViewModel للدخول الخاطئ + اختبار DAO واحد.
+
+
+---
+
+## 10. تقرير تنفيذ «حل كل المشاكل» — من الوكيل 3 إلى 0 (ومنّي إلى نفسي)
+
+بعد الدمج (`bb44076`: فرع الكود `ff5110e8` داخل فرع التوثيق) نُفِّذت الإصلاحات في الشيفرة نفسها
+بدل الرقع. التفاصيل الكاملة بجدول «الحالة/ما تم/كيف تتحقق» في [`GAP_TO_APK.md`](GAP_TO_APK.md) §7.
+
+### 10.1 للوكيل 0 (المنسّق — CI والتوقيع والدمج) — 4 أشياء فقط
+
+1. **ادمج هذا الفرع، ولا تُطبِّق `patches/0001..0003` عليه** (أصبحت داخل الشيفرة؛ `git am` يتعارض).
+   `patches/README.md` فيه التحذير نفسه.
+2. **`gradle-wrapper.jar` هو الحاجز الوحيد الباقي أمام APK أخضر** — لا يُنشأ بلا شبكة:
+   `./scripts/download-gradlew.sh 8.7` ثم `git add -f apps/*/gradlew apps/*/gradle/wrapper/*.jar` في commit واحد.
+3. **الـ workflow الجديد يفرض الحقيقة**:بوّابة «APK > 1MB» + `if-no-files-found: error` + رفع
+   `build-logs/` كـ artifact + annotations من `* What went wrong:`. لو ظهر فشل `Java heap space`
+   رغم `apps/*/gradle.properties` فالحل هو `TAMM_EXTRA_GRADLE_ARGS=--max-workers=2` (لا تُنقص Xmx).
+4. **`versionCode` صار من البيئة** (`TAMM_VERSION_CODE`) والـ CI يضبطه على `github.run_number` —
+   لا تضبطه يدوياً على 1 عند رفع AAB، وإلا رفض Play «versionCode ≤ السابق».
+
+### 10.2 للوكيل 1 (كود التطبيق) — ما لمسته في `apps/` ولماذا
+
+| الملف | التغيير | لماذا |
+|---|---|---|
+| `app/build.gradle.kts` | `import` أعلى الملف (قبل `plugins {}`)، `keystore.properties` → `signingConfigs`، `TAMM_VERSION_CODE`، `testInstrumentationRunner`، توابع junit/espresso داخل `dependencies {}`، `sourceSets.androidTest.assets`، `lint.abortOnError=true`، `kapt { room.schemaLocation }` | A1/B1/B5/C7 — كلها كانت ستفشل في CI أو تُبقي الاختبارات مستحيلة |
+| `util/PasswordHasher.kt` (جديد، التطبيقان) | PBKDF2 + صيغة ذاتية الوصف + `verify`/`needsRehash` | C1 — كان `login` لا يتحقق إطلاقاً |
+| `AuthViewModel.kt` | تحقق كلمة المرور، `register(...)`، `refreshFirstRunState()`، ترقية بصمت | C1 — بلا هذا لا يمكن لأي مستخدم الدخول أصلاً (الجدول فارغ) |
+| `LoginScreen.kt` (التطبيقان) | وضع «إنشاء أول حساب» + تفعيل زر orders المعطّل | C1 — الزر كان `onClick { // simplified }` فارغاً |
+| `UserDao`/`MarketerUserDao` + `*Repository` | `COUNT(*)` → `count()` | لازم لوضع أول تشغيل؛ `countByRole` الموجود لا يكفي (جدول فارغ = 0 لكل دور) |
+| `AndroidManifest.xml` | حذف 5 أذونات ميتة، `fullBackupContent`/`dataExtractionRules`، حذف `screenOrientation` | C3/C5/C6 |
+| `res/xml/{backup_rules,data_extraction_rules}.xml` (جديد) | استثناء قواعد Room و`sharedpref` | C5 |
+| `proguard-rules.pro` | قواعد أضيق + مِظلّة keep في آخر ملف (احذفها حين يُختبر R8) | B4 |
+| `app/schemas/README.md` (جديد) | مكان إخراج مخططات Room (يُولَّد عند أول kapt) | A1 |
+| `src/test/java/**/PasswordHasherTest.kt` (جديد) | 9 فحوص لكل تطبيق (round‑trip، رفض كلمة خاطئة، رفض النص الصريح، الملح، التلاعب، iterations ضعيفة، طول قصير، لا rehash) | C7 |
+
+**قررت ألا ألوّث `apps/` بأشياء تحتاج قراراً منك:** لم أضف طبقة شبكة (C2)، ولا إشعارات/WorkManager
+(C4)، ولا `androidTest` على جهاز، ولم أحذف Coil/Timber، ولم ألمس أيقونة orders (vector فقط). أيها
+يحتاج اختيار مكتبة/خدمة أو موارد رسومية — أخبرني بالاختيار وأُسلّم التنفيذ.
+
+### 10.3 للوكيل 2 (السكربتات) — صحتُ على ملفاتك لأن المِلكية انقلبت بالدمج
+
+`android-sdk-setup.sh` (سطر 83 + تعليقان)، `sign-apk.sh` (env + غير تفاعلي + بصمة + zipalign)،
+`download-gradlew.sh` (نسخة من الوسيط + اكتشاف المشاريع + 8.7)، `check-env.sh` (فحص Java رقمياً +
+Wrapper لكل مشروع + `echo -e`). `bash -n` نظيف على `scripts/*.sh` كلها و`mock-smoke.sh` 89/89 —
+**لا تُرجع أيّاً منها بحجة الأفضلية الأسلوبية**؛ كل تغيير له سطر تبرير في `TROUBLESHOOTING.md` §9
+و`scripts/README.md` §3–5. لو أردت إعادة هيكلة (مثلاً نقل اكتشاف المشاريع إلى دالة مشتركة
+`lib/apps.sh`) فافعلها في patch منفصل بعد دمج 0 لفرعي، حتى لا نفقد ما يختبره CI.
+
+### 10.4 ما زالت لا تُحل من هنا (ولا تدّعِ أنها حُلّت)
+
+* أي تأكيد أن `assembleDebug` يمرّ: لا JDK ولا SDK ولا `services.gradle.org` في بيئة التوثيق.
+* رفع `gradle-wrapper.jar` (شبكة)، توليد keystore حقيقي (لا يُخزَّن في git)، سياسة Play للشاشات
+  الكبيرة (Console)، C2/C4 (قرار منتج)، وأرقام build-tools الموحّدة.
+* لذلك «حللت كل المشاكل» تعني: **12 من 16 بنداً مُطبَّقة في الشيفرة وقابلة للتحقق offline**،
+  و4 بنود موثَّقة كقرارات/عيوب متبقية بحكم مالكية الملفات — الجدول في `GAP_TO_APK.md` §7.

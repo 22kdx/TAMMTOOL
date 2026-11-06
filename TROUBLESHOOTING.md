@@ -293,6 +293,27 @@ export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
 
 ---
 
+### 5.3 «بيانات الدخول غير صحيحة» رغم أن الحساب صحيح — أو لا يمكن الدخول إطلاقاً ✅
+
+**الحالة (كانت كذلك قبل 2026‑11‑06 مساءً):** `AuthViewModel.login()` كان يبحث بالهاتف ويفحص
+`isActive` **فقط** — أي كلمة مرور تُقبل؛ ولا يوجد أي مسار لإنشاء مستخدم ⇒ جدول `users` يبقى
+فارغاً والدخول مستحيلاً عملياً.
+
+**الحل المطبَّق:** `util/PasswordHasher.kt` (PBKDF2‑HMAC‑SHA256، 120k تكرار، ملح 16 بايت،
+الصيغة `pbkdf2:<alg>:<iters>$<salt-hex>$<hash-hex>`) + تحقق في `login` + `register` في التطبيقين
++ `COUNT(*)` في DAO/Repository + شاشة الدخول تعرض «إنشاء أول حساب» حين تكون القاعدة فارغة.
+
+| العَرَض | السبب | العلاج |
+|---|---|---|
+| «بيانات الدخول غير صحيحة» لحساب جديد | أنشأت الحساب قبل التحديث (الحقل كان نصاً صريحاً/فارغاً) | سجّل الدخول مرة بوضع الإنشاء من جديد، أو احذف بيانات التطبيق: `adb shell pm clear com.tammtool.marketerapp` |
+| الدخول بطيء ~0.2–0.5 ثانية | 120k تكرار PBKDF2 — مقصود لمقاومة القوة الغاشمة | لا تُنقصه تحت 100k؛ إن أردت تحسيناً ارفع إلى `Dispatchers.IO` وقد خُصص لذلك عبر `launchBlock` |
+| مستخدم قديم على API 24/25 | `PBKDF2WithHmacSHA256` غير متوفر هناك | المسار يسقط إلى `PBKDF2WithHmacSHA1` تلقائياً، واسم الخوارزمية مخزَّن داخل الصيغة نفسها |
+| «رقم الهاتف مسجل مسبقاً» في أول تشغيل | هناك صف واحد على الأقل في الجدول | أضف دوراً من إدارة المستخدمين، أو امسُح القاعدة من إعدادات التطبيق |
+
+**لا تقارن كلمات المرور يدوياً في أي كود جديد:** استخدم `PasswordHasher.verify(raw, stored)`
+(يرفض النص الصريح والصيغ القصيرة ويستخدم `MessageDigest.isEqual`)، وراقب الترقية بصمت عبر
+`needsRehash`. الاختبارات: `apps/*/app/src/test/java/**/PasswordHasherTest.kt` (9 فحوص لكل تطبيق).
+
 ## 6. أخطاء التوقيع والإصدار
 
 | الرسالة | الحل |
@@ -381,11 +402,19 @@ rm -rf dist/ build-logs/ test-reports/ screenshots/ apps/*/.gradle apps/*/app/bu
 | `apk-test.sh` | كان يفترض `com.tammtool.marketerapp` حتى لاختبار orders-delivery | ✅ يستخرج الحزمة من APK (aapt2 → aapt → apkanalyzer → تحليل Manifest) أو `--package` |
 | `apk-test.sh` | `timeout … adb logcat \| grep` يكسر `pipefail` ويعطي نجاحاً زائفاً | ✅ فحوص فعلية (pid + بحث FATAL/ANR) ورموز خروج 2/3/4/5 |
 | `apk-test.sh` | فشل غامض إن لم يكن `adb` مثبتاً | ✅ رسالة فيها أمر التثبيت لكل نظام، وكل أوامر الفحص الثابت تعمل بدونه |
-| `android-sdk-setup.sh` | **سطر 83 فيه بقايا `<<<<>>>` → خطأ صيغة** | ❌ مفتوح (الوكيل 2) — تحايل عليه `build-apk.sh` بتثبيت SDK داخلي |
+| `android-sdk-setup.sh` | **سطر 83 فيه بقايا `<<<<>>>` → خطأ صيغة** | ✅ مُصلح في `arena/68a3e358` (2026‑11‑06): السطر أصبح `echo …`؛ وعُلِّق كوري صار عربياً؛ و«síesno» → «sdkmanager». `bash -n` نظيف، والـ workflow يناديه بـ `--sdk-dir … --accept-licenses` (الوسيطان موجودان فعلاً) |
 | `android-sdk-setup.sh` | يثبّت `build-tools;35.0.0` بينما CI يثبّت `34.0.0` | ⚠️ تفاوت — يُفضّل توحيد الرقم (AGP 8.6 يعمل مع 34.0.0 و35.0.0) |
-| `download-gradlew.sh` | يكتب `distributionUrl=gradle-8.5-bin.zip` ثابتاً بغض النظر عن نسخة الطلب | ⚠️ مفتوح — قد يولّد Wrapper بنسخة غير المطلوبة |
-| `sign-apk.sh` | كلمات المرور في `--ks-pass pass:…` (مرئية في `ps`) وسؤال غير تفاعلي يفشل | ⚠️ مفتوح — استخدم `--ks-pass env:KEYSTORE_PASSWORD` |
-| `check-env.sh` | يفحص `./gradlew` في جذر المستودع (حيث لا يوجد أبداً) | ⚠️ مفتوح — يجب فحص `apps/*/gradlew` |
+| `download-gradlew.sh` | يكتب `distributionUrl=gradle-8.5-bin.zip` ثابتاً بغض النظر عن نسخة الطلب | ✅ مُصلح: الـ heredoc صار غير مقبوس ويستخدم `$GRADLE_VERSION` (افتراضي **8.7** لمطابقة AGP 8.6) + `validateDistributionUrl=true` + اكتشاف المشاريع بدل قائمة يدوية (يُصلح `apps/marketer` و`apps/orders-delivery` و`examples/hello-world` و`templates/basic-app`) |
+| `sign-apk.sh` | كلمات المرور في `--ks-pass pass:…` (مرئية في `ps`) وسؤال غير تفاعلي يفشل | ✅ مُصلح: `--ks-pass env:KEYSTORE_PASSWORD` / `env:KEY_PASSWORD`، وبلا TTY يرفض برسالة واضحة بدل التعليق، ويطبع `verify --verbose --print-certs` (البصمة التي تُقارَن في Play) + فحص `zipalign -c` |
+| `check-env.sh` | يفحص `./gradlew` في جذر المستودع (حيث لا يوجد أبداً) | ✅ مُصلح: يفحص `gradlew` + `gradle-wrapper.jar` **لكل مشروع** ويأمر بـ `download-gradlew.sh 8.7` عند الغياب؛ وفحص Java صار رقمياً (`11.0.17` كان يمرّ لأن `grep -E '17\|21\|…'` يطابق أي سطر يحوي 17)؛ وألوان الملخص بـ `echo -e` |
+
+**يبقى مفتوحاً هنا:** لا يمكن توليد `gradle-wrapper.jar` فعلياً في هذه البيئة (`services.gradle.org`
+محجوب)، فأمر `download-gradlew.sh` يُنفَّذ في CI أو على جهازك ثم يُرفَع الـ jar:
+
+```bash
+./scripts/download-gradlew.sh 8.7
+git add -f apps/*/gradlew apps/*/gradle/wrapper/gradle-wrapper.jar apps/*/gradle/wrapper/gradle-wrapper.properties
+```
 
 **للاطمئنان إلى السكربتات نفسها** (بلا Android، بلا هاتف، بلا إنترنت):
 

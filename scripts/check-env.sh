@@ -27,12 +27,16 @@ echo " TAMMTOOL - فحص بيئة بناء تطبيقات Android"
  echo ""
 
 # 1. Java / JDK
+# فحص الإصدار رقمياً: كان grep -E '17|21|…' يطابق أي سطر فيه «17» (مثل 11.0.17) فيمرّ JDK 11
 if command -v java >/dev/null 2>&1; then
   JAVA_VERSION=$(java -version 2>&1 | head -n 1 | cut -d'"' -f2)
-  if java -version 2>&1 | grep -qiE '17|21|1[7-9]|[2-9][0-9]'; then
-    ok "Java JDK مثبّت: $JAVA_VERSION"
+  JAVA_MAJOR=$(printf '%s\n' "$JAVA_VERSION" | awk -F. '{ if ($1 == 1) print $2; else print $1 }' | tr -dc '0-9')
+  if [[ -z "${JAVA_MAJOR:-}" ]]; then
+    warn "تعذّر قراءة رقم إصدار Java من: $JAVA_VERSION"
+  elif (( JAVA_MAJOR >= 17 )); then
+    ok "Java JDK $JAVA_MAJOR ($JAVA_VERSION) — يلبي حد AGP 8.x الأدنى (17)"
   else
-    warn "Java JDK مثبت بإصدار قديم: $JAVA_VERSION (يُوصى بالإصدار 17 أو أحدث)"
+    bad "Java $JAVA_MAJOR قديم مقابل Android Gradle Plugin 8.6 الذي يتطلب JDK 17+ (الموجود: $JAVA_VERSION)"
   fi
 else
   bad "Java JDK غير مثبت. يُرجى تثبيت JDK 17 أو أحدث."
@@ -65,17 +69,32 @@ if [[ "$APKSIGNER_FOUND" -eq 0 ]]; then
   bad "apksigner غير موجود. يُرجى تثبيت Android SDK Build-Tools."
 fi
 
-# 5. Gradle Wrapper
-if [[ -x "./gradlew" ]]; then
-  ok "Gradle Wrapper موجود في جذر المشروع."
-  if ./gradlew --version >/dev/null 2>&1; then
-    ok "Gradle Wrapper يعمل بشكل صحيح."
+# 5. Gradle Wrapper — لكل مشروع على حدة (الجذر لا يحتوي gradlew أصلاً في TAMMTOOL)
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP_DIRS=()
+for root in apps examples projects templates; do
+  [[ -d "$PROJECT_ROOT/$root" ]] || continue
+  for dir in "$PROJECT_ROOT/$root"/*/; do
+    [[ -f "${dir}settings.gradle" || -f "${dir}settings.gradle.kts" ]] && APP_DIRS+=("${dir%/}")
+  done
+done
+[[ ${#APP_DIRS[@]} -eq 0 ]] && APP_DIRS+=("$PROJECT_ROOT")
+
+missing_wrapper=0
+for app_dir in "${APP_DIRS[@]}"; do
+  name="${app_dir#$PROJECT_ROOT/}"
+  if [[ -x "$app_dir/gradlew" && -f "$app_dir/gradle/wrapper/gradle-wrapper.jar" ]]; then
+    ok "Wrapper موجود: $name (gradlew + gradle-wrapper.jar)"
+    if (cd "$app_dir" && ./gradlew --version >/dev/null 2>&1); then
+      ok "Wrapper يعمل: $name"
+    else
+      warn "يعطّل عند التشغيل: $name — جرّب: (cd $name && ./gradlew --version)"
+    fi
   else
-    warn "Gradle Wrapper موجود لكنه يواجه خطأ عند التشغيل."
+    missing_wrapper=1
+    bad "لا wrapper في $name (ينقص gradlew أو gradle-wrapper.jar) — أنشئه: ./scripts/download-gradlew.sh 8.7"
   fi
-else
-  warn "Gradle Wrapper غير موجود في المسار الحالي. تأكد من أنك في جذر مشروع Android."
-fi
+done
 
 # 6. Git
 if command -v git >/dev/null 2>&1; then
@@ -86,7 +105,7 @@ fi
 
 echo ""
 echo "============================================="
-echo "النتيجة: ${GREEN}نجاح: $PASS${NC} | ${YELLOW}تحذيرات: $WARN${NC} | ${RED}فشل: $FAIL${NC}"
+echo -e "النتيجة: ${GREEN}نجاح: $PASS${NC} | ${YELLOW}تحذيرات: $WARN${NC} | ${RED}فشل: $FAIL${NC}"
 echo "============================================="
 
 if [[ "$FAIL" -gt 0 ]]; then

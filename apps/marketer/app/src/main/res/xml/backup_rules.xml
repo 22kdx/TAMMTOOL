@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- C5 (GAP_TO_APK.md): قواعد النسخ الاحتياطي لـ API ≤ 30 — بيانات المستخدمين والطلبات
+     والمعاملات لا تذهب إلى Google Drive. -->
+<full-backup-content>
+    <exclude domain="database" path="marketer_app_db" />
+    <exclude domain="database" path="marketer_app_db-journal" />
+    <exclude domain="database" path="marketer_app_db-wal" />
+    <exclude domain="database" path="marketer_app_db-shm" />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="file" path="screenshots" />
+</full-backup-content>

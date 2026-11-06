@@ -13,7 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.TextInputType
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.tammtool.marketerapp.ui.theme.MarketerTheme
 import com.tammtool.marketerapp.ui.viewmodel.AuthViewModel
@@ -60,7 +60,7 @@ fun LoginScreen(
             value = phone,
             onValueChange = { phone = it },
             label = { Text("رقم الهاتف") },
-            keyboardOptions = KeyboardOptions(keyboardType = TextInputType.Number),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             trailingIcon = {
@@ -78,8 +78,8 @@ fun LoginScreen(
             value = password,
             onValueChange = { password = it },
             label = { Text("كلمة المرور") },
-            visualTransformation = if (showPassword) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.VisualTransformation.Password,
-            keyboardOptions = KeyboardOptions(keyboardType = TextInputType.VisiblePassword),
+            visualTransformation = if (showPassword) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.VisiblePassword),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             trailingIcon = {
@@ -94,7 +94,7 @@ fun LoginScreen(
 
         if (error != null) {
             Text(
-                text = error,
+                text = error.orEmpty(),
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = 8.dp)
             )

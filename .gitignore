@@ -1,0 +1,3 @@
+# Local build-tool diagnostics and Python test caches
+.build-logs/
+__pycache__/

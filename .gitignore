@@ -1,0 +1,48 @@
+# ─────────────────────────────────────────────────────────────
+# TAMMTOOL — ما لا يجب أن يصل إلى git
+# (مخرجات البناء المحلي الذي تنتجه سكربتات scripts/)
+# ─────────────────────────────────────────────────────────────
+
+# مخرجات scripts/build-apk.sh
+/dist/
+/build-logs/
+
+# مخرجات scripts/apk-test.sh
+/test-reports/
+/screenshots/
+
+# مخرجات Gradle / Android لكل تطبيق (apps/<app>/ و examples/<app>/)
+**/build/
+**/.gradle/
+**/local.properties
+local.properties
+
+# ملفات البناء نفسها (كبيرة — تُنزَّل من Actions أو تُبنى محلياً)
+*.apk
+*.aab
+*.apks
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# مفاتيح التوقيع — ممنوع رفعها أبداً
+*.jks
+*.keystore
+*.keystore.properties
+keystore.properties
+
+# أسرار وبيئة محلية
+.env
+.env.local
+*.secret
+google-services.json
+
+# IDE / نظام التشغيل
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.log

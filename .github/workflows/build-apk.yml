@@ -92,10 +92,33 @@ jobs:
           echo "=== local.properties ==="
           cat local.properties
 
+      - name: Pre-build diagnostics
+        working-directory: apps/marketer
+        run: |
+          echo "=== Pre-build Diagnostics ==="
+          echo ""
+          echo "=== local.properties ==="
+          cat local.properties 2>/dev/null || echo "local.properties NOT FOUND"
+          echo ""
+          echo "=== Android SDK existence ==="
+          ls -la $HOME/android-sdk/ 2>/dev/null || echo "Android SDK NOT FOUND"
+          echo ""
+          echo "=== Platforms ==="
+          ls -la $HOME/android-sdk/platforms/ 2>/dev/null || echo "No platforms"
+          echo ""
+          echo "=== Build tools ==="
+          ls -la $HOME/android-sdk/build-tools/ 2>/dev/null || echo "No build-tools"
+          echo ""
+          echo "=== Root build.gradle.kts ==="
+          cat build.gradle.kts
+          echo ""
+          echo "=== App build.gradle.kts ==="
+          cat app/build.gradle.kts
+
       - name: Build Debug APK
         working-directory: apps/marketer
         env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_HOME: $HOME/android-sdk
           GRADLE_USER_HOME: $HOME/.gradle
         run: |
           echo "=== BUILD START $(date) ===" > ci-build.log

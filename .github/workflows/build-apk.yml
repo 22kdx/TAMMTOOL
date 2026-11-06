@@ -104,12 +104,14 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add apps/marketer/ci-build.log
           git commit -m "CI build log from run ${{ github.run_id }} (exit: ${{ env.BUILD_EXIT }})" || echo "COMMIT FAILED"
-          git push origin arena/6b69a15d-tammtool || echo "PUSH FAILED"
+          git push origin arena/6b69a15d-tammtool || echo "PUSH FAILED - continuing anyway"
+          echo "Save log step completed (non-critical)"
 
       - name: Upload APK artifact
-        if: success()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: afghani-orders-apk
           path: apps/marketer/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+          if-no-files-found: warn

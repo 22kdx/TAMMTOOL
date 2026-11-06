@@ -85,6 +85,7 @@ jobs:
 
       - name: Save build log to repository (always)
         if: always()
+        continue-on-error: true
         working-directory: apps/marketer
         run: |
           echo "=== Files in apps/marketer ==="

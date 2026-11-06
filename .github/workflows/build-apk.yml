@@ -68,38 +68,41 @@ jobs:
         run: |
           echo "sdk.dir=$HOME/android-sdk" > local.properties
 
-      - name: Build Debug APK - capture output to root log
+      - name: Build Debug APK - capture output
         working-directory: apps/marketer
         env:
           ANDROID_HOME: $HOME/android-sdk
         run: |
-          echo "=== BUILD START ===" > ../ci-build.log
-          echo "JAVA_HOME=$JAVA_HOME" >> ../ci-build.log
-          echo "ANDROID_HOME=$ANDROID_HOME" >> ../ci-build.log
-          echo "=== RUNNING GRADLE ===" >> ../ci-build.log
+          echo "=== BUILD START $(date) ===" > ci-build.log
+          echo "JAVA_HOME=$JAVA_HOME" >> ci-build.log
+          echo "ANDROID_HOME=$ANDROID_HOME" >> ci-build.log
+          echo "=== RUNNING GRADLE ===" >> ci-build.log
           set +e
-          gradle :app:assembleDebug --stacktrace --info >> ../ci-build.log 2>&1
+          gradle :app:assembleDebug --stacktrace --info >> ci-build.log 2>&1
           BUILD_EXIT=$?
-          echo "=== BUILD EXIT: $BUILD_EXIT ===" >> ../ci-build.log
+          echo "=== BUILD EXIT CODE: $BUILD_EXIT ===" >> ci-build.log
           echo "BUILD_EXIT=$BUILD_EXIT" >> $GITHUB_ENV
 
       - name: Save build log to repository (always)
         if: always()
+        working-directory: apps/marketer
         run: |
-          echo "=== Checking for ci-build.log at repo root ==="
+          echo "=== Files in apps/marketer ==="
+          ls -la
+          echo ""
+          echo "=== ci-build.log check ==="
           if [[ -f ci-build.log ]]; then
-            echo "ci-build.log found, size: $(wc -c < ci-build.log) bytes"
+            echo "ci-build.log EXISTS, size: $(wc -c < ci-build.log) bytes"
             echo "=== Content ==="
             cat ci-build.log
           else
-            echo "ci-build.log NOT FOUND at repo root"
-            echo "Searching..."
-            find . -name "ci-build.log" -type f 2>/dev/null || echo "Not found anywhere"
+            echo "ci-build.log NOT FOUND"
             echo "NO BUILD OUTPUT" > ci-build.log
           fi
+          cd ..
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ci-build.log
+          git add apps/marketer/ci-build.log
           git commit -m "CI build log from run ${{ github.run_id }} (exit: ${{ env.BUILD_EXIT }})" || echo "COMMIT FAILED"
           git push origin arena/6b69a15d-tammtool || echo "PUSH FAILED"
 

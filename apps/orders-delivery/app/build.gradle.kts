@@ -3,7 +3,6 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.20"
     id("com.google.dagger.hilt.android") version "2.50"
-    id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
 android {
@@ -49,7 +48,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
+        kotlinCompilerExtensionVersion = "1.5.4"
     }
 
     packaging {

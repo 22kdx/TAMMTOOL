@@ -45,7 +45,10 @@ jobs:
           echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/android-sdk/licenses/android-sdk-preview-license
 
           yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --install \
-            "platform-tools" "platforms;android-35" "build-tools;35.0.0" > /dev/null 2>&1 || true
+            "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+          echo "=== Installed SDK packages ==="
+          $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --list-installed || echo "sdkmanager --list-installed failed"
 
           $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --version
 
@@ -67,6 +70,19 @@ jobs:
         working-directory: apps/marketer
         run: |
           echo "sdk.dir=$HOME/android-sdk" > local.properties
+          echo "=== local.properties ==="
+          cat local.properties
+
+      - name: Verify local.properties exists
+        working-directory: apps/marketer
+        run: |
+          if [[ -f local.properties ]]; then
+            echo "local.properties EXISTS"
+            cat local.properties
+          else
+            echo "local.properties MISSING - creating now"
+            echo "sdk.dir=$HOME/android-sdk" > local.properties
+          fi
 
       - name: Build Debug APK - capture output
         working-directory: apps/marketer
@@ -78,11 +94,13 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME" >> ci-build.log
           echo "=== RUNNING GRADLE ===" >> ci-build.log
           set +e
-          gradle :app:assembleDebug --stacktrace --info >> ci-build.log 2>&1
+          set -o pipefail
+          gradle :app:assembleDebug --stacktrace --info 2>&1 | tee -a ci-build.log
           BUILD_EXIT=$?
-          echo "=== BUILD EXIT CODE: $BUILD_EXIT ===" >> ci-build.log
-          echo "=== Build output directory contents ===" >> ci-build.log
-          find app/build -type f 2>/dev/null | head -30 >> ci-build.log || echo "No build output files found" >> ci-build.log
+          set +o pipefail
+          echo "=== BUILD EXIT CODE: $BUILD_EXIT ===" | tee -a ci-build.log
+          echo "=== Build output directory contents ===" | tee -a ci-build.log
+          find app/build -type f 2>/dev/null | head -30 | tee -a ci-build.log || echo "No build output files found" | tee -a ci-build.log
           echo "BUILD_EXIT=$BUILD_EXIT" >> $GITHUB_ENV
 
       - name: Save build log to repository (always)

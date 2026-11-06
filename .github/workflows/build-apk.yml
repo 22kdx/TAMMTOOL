@@ -24,6 +24,17 @@ jobs:
           java-version: 17
           distribution: temurin
 
+      - name: Install Gradle 8.5
+        run: |
+          curl -L --fail --retry 3 --retry-delay 5 \
+            -o $HOME/gradle-8.5-bin.zip \
+            https://services.gradle.org/distributions/gradle-8.5-bin.zip
+          unzip -q -o $HOME/gradle-8.5-bin.zip -d $HOME/
+          rm -f $HOME/gradle-8.5-bin.zip
+          echo "GRADLE_HOME=$HOME/gradle-8.5" >> $GITHUB_ENV
+          echo "PATH=$HOME/gradle-8.5/bin:$PATH" >> $GITHUB_ENV
+          gradle --version
+
       - name: Install Android SDK
         run: |
           mkdir -p $HOME/android-sdk/cmdline-tools
@@ -56,6 +67,9 @@ jobs:
           echo "=== Java version ==="
           java -version 2>&1 || true
           echo ""
+          echo "=== Gradle version ==="
+          gradle --version
+          echo ""
           echo "=== ANDROID_HOME ==="
           echo "$ANDROID_HOME"
           echo ""
@@ -78,22 +92,20 @@ jobs:
           echo "=== local.properties ==="
           cat local.properties
 
-      - name: Make gradlew executable
-        working-directory: apps/marketer
-        run: chmod +x ./gradlew
-
       - name: Build Debug APK
         working-directory: apps/marketer
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          GRADLE_USER_HOME: $HOME/.gradle
         run: |
           echo "=== BUILD START $(date) ===" > ci-build.log
           echo "=== Environment ===" >> ci-build.log
           echo "ANDROID_HOME=$ANDROID_HOME" >> ci-build.log
           echo "JAVA_HOME=$JAVA_HOME" >> ci-build.log
+          echo "GRADLE_USER_HOME=$GRADLE_USER_HOME" >> ci-build.log
           echo "" >> ci-build.log
           echo "=== Running Gradle build ===" >> ci-build.log
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace --info 2>&1 | tee -a ci-build.log
+          gradle :app:assembleDebug --no-daemon --stacktrace --info 2>&1 | tee -a ci-build.log
           BUILD_EXIT=${PIPESTATUS[0]}
           echo "" >> ci-build.log
           echo "=== BUILD EXIT CODE: $BUILD_EXIT ===" >> ci-build.log

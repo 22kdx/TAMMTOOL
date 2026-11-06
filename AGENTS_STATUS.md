@@ -8,45 +8,56 @@
 
 ## الوكيل 0 — المنسق الرئيسي (أنا)
 
-**الحالة:** 🔧 يعمل على الإصلاح — **تم العثور على السبب الجذري من سجلات CI**
+**الحالة:** 🔧 يعمل على الإصلاح — **تحسين كود Flutter وإصلاح CI جارٍ**
 
 **المهام:**
 | المهمة | الحالة | الملاحظات |
 |--------|--------|-----------|
-| إصلاح GitHub Actions CI | 🔧 يعمل | تم العثور على السبب الجذري، إصلاح جارٍ |
+| إصلاح GitHub Actions CI | 🔧 يعمل | workflow محدث: إزالة continue-on-error، إضافة if-no-files-found: error، إصلاح ANDROID_HOME |
 | إعداد نظام تعاون الوكلاء | ✅ مكتمل | TEAM_COLLABORATION.md، AGENTS_STATUS.md |
 | دمج أعمال الوكلاء 1, 2, 3 | ⏳ منتظر | لم يرد أي وكيل بعد |
-| بناء APK نهائي | ⏳ منتظر | في انتظار تأكيد نجاح CI |
+| بناء APK نهائي | ⏳ منتظر | في انتظار تأكيد نجاح CI (#70-76 قيد التشغيل) |
 
-**السبب الجذري (تم العثور عليه من سجل التشغيل #68):**
+**التحسينات المطبقة على تطبيق Flutter (apps/flutter-app/):**
 
-المشكلة ليست في Gradle أو Flutter نفسه، بل في إعدادات مشروع Flutter Android:
+1. **نظام ثيمات موحد** (`lib/theme/app_theme.dart`):
+   - الوضع الفاتح والداكن مع Material 3
+   - ألوان موحدة، أنماط نص، وأزرار
+   - دعم RTL عبر EdgeInsetsDirectional
 
-1. **ملف AndroidManifest.xml في المسار الخاطئ:** Flutter 3.19.0 يبحث عن `AndroidManifest.xml` مباشرة في مجلد `android/` (أي `apps/flutter-app/android/AndroidManifest.xml`)، لكن الملف كان موجوداً فقط في `android/app/src/main/AndroidManifest.xml`. Flutter فشل في العثور عليه وأخرج رسالة:
-   ```
-   No `/home/runner/work/TAMMTOOL/TAMMTOOL/apps/flutter-app/android/AndroidManifest.xml` file
-   Build failed due to use of deprecated Android v1 embedding.
-   ```
+2. **إدارة الحالة** (`lib/providers/app_state_provider.dart`):
+   - تبديل الثيم (فاتح/داكن)
+   - تغيير اللغة (العربية/الإنجليزية)
+   - كشف اتجاه RTL تلقائياً
 
-2. **تراخيص Android غير مقبولة:** `flutter doctor` أظهر:
-   ```
-   [!] Android toolchain - develop for Android devices (Android SDK version 35.0.0)
-       ! Some Android licenses not accepted. To resolve this, run: flutter doctor --android-licenses
-   ```
+3. **الدعم اللغوي (l10n)** (`lib/l10n/app_localizations.dart`):
+   - ترجمات عربية وإنجليزية
+   - LocalizationsDelegate مخصص
 
-**الإصلاح المطبق (commit 9d6b03f):**
-- نسخ `AndroidManifest.xml` من `android/app/src/main/` إلى `android/` الجذر
-- إضافة خطوة `sdkmanager --licenses` لقبول تراخيص Android SDK
-- إضافة خطوة `flutter doctor --android-licenses` لقبول تراخيص Flutter Android
+4. **شاشة principale محسّنة** (`lib/screens/home_screen.dart`):
+   - دعم RTL (EdgeInsetsDirectional، AlignmentDirectional)
+   - حالات التحميل والخطأ والبيانات الفارغة
+   - أزرار تغيير الثيم واللغة في شريط التطبيق
+   - بطاقات إجراء سريع ومحتوى متجاوب
 
-**تشغيلات CI التي جريتها (جميعها 153 بايت artefact قبل الإصلاح):**
-| رقم التشغيل | SHA | التاريخ | النظام المستخدم | نتيجة artefact |
-|-------------|-----|---------|----------------|----------------|
-| 49-57 | متعدّدة | 18:07-18:43 | Gradle مباشر | 153 بايت |
-| 58-61 | متعدّدة | 18:47-18:53 | Gradle wrapper | 153 بايت |
-| 61-68 | متعدّدة | 18:57-19:07 | Flutter 3.19.0 | 153 بايت |
+5. **اختبارات** (`test/widget_test.dart`، `test/home_screen_test.dart`):
+   - اختبارات لواجهة التطبيق، الثيمات، إدارة الحالة، الترجمات
 
-**التشغيل القادم (#69+):** سيحتوي على الإصلاحات أعلاه، ننتظر تأكيد النجاح.
+6. **إصلاح هيكل Android module:**
+   - `android/build.gradle` على مستوى المشروع
+   - `android/gradle.properties`
+   - Gradle wrapper properties
+   - مسار Flutter source تم تصحيحه (`../..` → `..`)
+   - `MainActivity.kt` يمتد `FlutterActivity` للإصدار v2
+
+7. **إصلاح workflow CI:**
+   - إزالة `continue-on-error` من خطوات APK
+   - استخدام `if-no-files-found: error` لرفع APK
+   - إصلاح `ANDROID_HOME` env expansion
+   - فشل صريح إذا لم يوجد APK
+   - رفع مسار APK محدد بدلاً من البحث في المستودع بأكمله
+
+**تشغيلات CI الحالية (#70-76):** قيد التشغيل — Flutter البناء الأولي يستغرق وقتاً طويلاً.
 
 ---
 
@@ -54,15 +65,24 @@
 
 | الملف | المسار | الغرض |
 |--------|--------|--------|
-| pubspec.yaml | apps/flutter-app/ | إعدادات المشروع، التبعيات |
-| lib/main.dart | apps/flutter-app/ | نقطة الدخول الرئيسية للتطبيق |
-| lib/screens/home_screen.dart | apps/flutter-app/ | شاشة المنزل |
-| android/AndroidManifest.xml | apps/flutter-app/android/ | بيان التطبيق (Flutter يبحث هنا مباشرة) |
+| pubspec.yaml | apps/flutter-app/ | إعدادات المشروع، التبعيات (أضيف intl) |
+| lib/main.dart | apps/flutter-app/ | نقطة الدخول مع الثيم واللغة |
+| lib/theme/app_theme.dart | apps/flutter-app/ | نظام ثيمات موحد (فاتح/داكن) |
+| lib/providers/app_state_provider.dart | apps/flutter-app/ | إدارة الحالة للثيم واللغة |
+| lib/l10n/app_localizations.dart | apps/flutter-app/ | ترجمات عربية وإنجليزية |
+| lib/screens/home_screen.dart | apps/flutter-app/ | شاشة principale محسّنة |
+| test/widget_test.dart | apps/flutter-app/ | اختبارات واجهة التطبيق |
+| test/home_screen_test.dart | apps/flutter-app/ | اختبارات شاشة الرئيسية |
+| android/build.gradle | apps/flutter-app/android/ | إعدادات بناء Android على مستوى المشروع |
+| android/gradle.properties | apps/flutter-app/android/ | إعدادات Gradle |
+| android/gradle/wrapper/gradle-wrapper.properties | apps/flutter-app/android/ | خصائص غلاف Gradle |
+| android/AndroidManifest.xml | apps/flutter-app/android/ | بيان التطبيق (Flutter يبحث هنا) |
 | android/app/build.gradle | apps/flutter-app/android/app/ | إعدادات بناء Android لـ Flutter |
-| android/app/src/main/AndroidManifest.xml | apps/flutter-app/android/app/src/main/ | بيان التطبيق (للأدوات الأخرى) |
-| android/app/src/main/res/values/ | apps/flutter-app/android/app/src/main/res/values/ | strings, colors, styles |
-| android/app/src/main/res/mipmap-*/ | apps/flutter-app/android/app/src/main/res/ | أيقونات اللانشر (5 كثافات) |
-| android/app/src/main/res/drawable/launch_background.xml | apps/flutter-app/android/app/src/main/res/drawable/ | خلفية الشاشة inicial |
+| android/app/src/main/AndroidManifest.xml | apps/flutter-app/android/app/src/main/ | بيان التطبيق |
+| android/app/src/main/kotlin/.../MainActivity.kt | apps/flutter-app/android/app/ | MainActivity يمتد FlutterActivity |
+| android/app/src/main/res/values/ | ... | strings, colors, styles |
+| android/app/src/main/res/mipmap-*/ | ... | أيقونات اللانشر (5 كثافات) |
+| android/app/src/main/res/drawable/launch_background.xml | ... | خلفية الشاشة inicial |
 
 ---
 
@@ -103,4 +123,4 @@
 
 ## آخر تحديث: 2026-11-06
 
-**المعالجة التالية:** انتظار نتيجة تشغيل CI #69+ بعد تطبيق إصلاح AndroidManifest.xml وقبول التراخيص.
+**المعالجة التالية:** انتظار نتيجة تشغيل CI (#70-76) للتحقق من نجاح بناء Flutter APK.

@@ -85,12 +85,17 @@ jobs:
           # التحقق من التثبيت
           gradle --version
 
+      - name: Create local.properties
+        working-directory: apps/marketer
+        run: |
+          echo "sdk.dir=$HOME/android-sdk" > local.properties
+
       - name: Build Debug APK (طلبات الأفغاني)
         working-directory: apps/marketer
         env:
           ANDROID_HOME: $HOME/android-sdk
           GRADLE_HOME: $HOME/gradle-8.5
-        run: gradle :app:assembleDebug
+        run: gradle :app:assembleDebug --stacktrace --info
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

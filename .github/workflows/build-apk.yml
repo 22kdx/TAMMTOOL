@@ -52,20 +52,6 @@ jobs:
 
           $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --version
 
-      - name: Install Gradle
-        run: |
-          curl -L --fail --retry 3 --retry-delay 5 \
-            -o $HOME/gradle-8.5-bin.zip \
-            https://services.gradle.org/distributions/gradle-8.5-bin.zip
-
-          unzip -q -o $HOME/gradle-8.5-bin.zip -d $HOME/
-          rm -f $HOME/gradle-8.5-bin.zip
-
-          echo "GRADLE_HOME=$HOME/gradle-8.5" >> $GITHUB_ENV
-          echo "PATH=$HOME/gradle-8.5/bin:$PATH" >> $GITHUB_ENV
-
-          gradle --version
-
       - name: Create local.properties
         working-directory: apps/marketer
         run: |
@@ -92,10 +78,10 @@ jobs:
           echo "=== BUILD START $(date) ===" > ci-build.log
           echo "JAVA_HOME=$JAVA_HOME" >> ci-build.log
           echo "ANDROID_HOME=$ANDROID_HOME" >> ci-build.log
-          echo "=== RUNNING GRADLE ===" >> ci-build.log
+          echo "=== RUNNING GRADLEW ===" >> ci-build.log
           set +e
           set -o pipefail
-          gradle :app:assembleDebug --stacktrace --info 2>&1 | tee -a ci-build.log
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace --info 2>&1 | tee -a ci-build.log
           BUILD_EXIT=$?
           set +o pipefail
           echo "=== BUILD EXIT CODE: $BUILD_EXIT ===" | tee -a ci-build.log
@@ -165,6 +151,7 @@ jobs:
               echo "No APK was built, creating placeholder"
               mkdir -p apk-output
               echo "No APK was built" > apk-output/no-apk.txt
+              exit 1
             fi
           fi
       - name: Upload APK artifact

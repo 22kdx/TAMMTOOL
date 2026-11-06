@@ -120,6 +120,20 @@ class BuildToolsTests(unittest.TestCase):
         p = self.run_script('android-sdk-setup.sh', '--invalid')
         self.assertEqual(p.returncode, 2)
 
+    def test_diagnose_preserves_failure_and_log(self):
+        self.projects(fail=True)
+        p = self.run_script('diagnose-apk.sh', 'marketer')
+        self.assertEqual(p.returncode, 7, p.stderr)
+        report = (self.root / '.build-logs/diagnose-marketer.log').read_text()
+        self.assertIn('BUILD_EXIT=7', report)
+        self.assertEqual((self.root / '.build-logs/diagnose-marketer.exit-code').read_text().strip(), '7')
+
+    def test_diagnose_success(self):
+        self.projects()
+        p = self.run_script('diagnose-apk.sh', 'marketer')
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn('BUILD_EXIT=0', p.stdout)
+
     def test_gradle_failure(self):
         self.projects(fail=True)
         p = self.run_script('build-apk.sh')

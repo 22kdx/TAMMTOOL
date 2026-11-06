@@ -85,3 +85,25 @@ bash scripts/apk-test.sh install path/to/app.apk DEVICE_SERIAL
 - تحقق فعلي محلي: 13 اختبارًا وهميًا ناجحًا، تشمل الآن مسار توقيع release والتحقق منه باستخدام أدوات وهمية، ورفض نجاح Gradle دون APK. فحص bash -n لكل سكريبت ناجح. لم ينتج APK Android حقيقي ولم يُختبر SDK عبر الإنترنت.
 - تنبيه الدمج: سكريبتات هذا الفرع مبنية على النسخة الأولية الفارغة؛ على المنسق مراجعة الفروق لا استبدال ملفاته آليًا. دعم bundle/AAB وuninstall/logcat/screenshot الموجود عند المنسق غير موجود هنا، كما أن check-env يُعامل غياب ADB كبيئة غير مكتملة، لا كمانع للبناء وحده. لا تُدمج ملفات الحالة فوق تقارير باقي الوكلاء دون حفظ أقسامهم.
 - طريقة الاستفادة: استعراض scripts/ على فرع arena/43aae3e2-tammtool ونقل التحسينات المرغوبة بعد المراجعة؛ مسار السجلات .build-logs/ يدعم رفعها كـ artifact بدل كتابة سجلات آلية إلى Git.
+
+### استجابة لطلب المنسق الجديد: سكريبت تشخيص عدم إنتاج APK
+في مراجعة التواصل قبل التوقف ظهر تحديث `7eccab826352b3823b74632606d8ffc9dfbba372` وفيه طلب صريح للوكيل 2 بإضافة سكريبت تشخيص؛ تم تنفيذه بدل التوقف.
+- أُضيف `scripts/diagnose-apk.sh [marketer|orders-delivery|all]`: يجمع فحص البيئة، يشغّل البناء مع السجل الكامل، يحفظ BUILD_EXIT الفعلي في التقرير وملف exit-code منفصل، ويجرد مسارات APK وoutput-metadata.json. لا يكتب إلى Git ولا ينشئ APK وهميًا؛ ويرجع رمز الفشل الحقيقي.
+- الاختبار: 15 اختبارًا وهميًا ناجحًا بما فيها حفظ فشل Gradle 7 وتشخيص النجاح؛ bash -n ناجح. لا يوجد بناء Android حقيقي في هذه البيئة.
+- تصحيح تفسير المنسق: نجاح خطوة shell الحالية لا يثبت أن Gradle رجع 0؛ بعد set +e تُحفظ قيمة Gradle ثم تنتهي الخطوة بـ echo ناجح. يلزم قراءة BUILD_EXIT نفسه أو استخدام سكريبت التشخيص الذي يعيد القيمة الفعلية.
+- سبب محدد لتعطل حفظ السجل حاليًا: الخطوة تبدأ داخل apps/marketer ثم تنفذ cd .. فتصل apps/؛ الأمر git add apps/marketer/ci-build.log يصبح نسبيًا إلى apps/، فيستهدف مسارًا خاطئًا. الحل المقترح للمنسق: العمل من جذر المستودع أو رفع apps/marketer/ci-build.log كـ artifact دون git commit.
+
+مثال CI مقترح للمنسق بعد دمج السكريبتات (لم يُعدل workflow هنا):
+```yaml
+- name: Diagnose marketer APK
+  run: bash scripts/diagnose-apk.sh marketer
+- name: Upload build diagnostics
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: marketer-build-diagnostics
+    path: .build-logs/
+    include-hidden-files: true
+    if-no-files-found: error
+```
+يجب إزالة ANDROID_HOME الحرفي `$HOME/android-sdk` من env خطوة البناء أو استبداله بمسار محلول، والحفاظ على إعداد SDK الصحيح. يحتوي تسليم b9cb2af على الأدوات الأساسية، والتسليم التالي على التشخيص؛ التغييرات متاحة بفرع الوكيل 2 للمراجعة ولا تعني دمجها أو قراءتها تلقائيًا من المنسق.

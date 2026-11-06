@@ -1,0 +1,67 @@
+From 53b68be35d889ddec0bd097317d5f806428d20da Mon Sep 17 00:00:00 2001
+From: agent-3-docs <agent-3@arena.local>
+Date: Fri, 6 Nov 2026 18:29:24 +0000
+Subject: [PATCH] =?UTF-8?q?build(apps):=20room.schemaLocation=20=D9=84?=
+ =?UTF-8?q?=D9=84=D8=AA=D8=B7=D8=A8=D9=8A=D9=82=D9=8A=D9=86=20=E2=80=94=20?=
+ =?UTF-8?q?=D9=8A=D8=B2=D9=8A=D9=84=20=D9=81=D8=B4=D9=84=20kapt=20=D8=A7?=
+ =?UTF-8?q?=D9=84=D9=85=D8=A4=D9=83=D8=AF?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+كلا التطبيقين يصرّحان exportSchema=true (marketer بالافتراضي لعدم تذكرته، orders
+صراحة في AppDatabase.kt سطر 22) مع غياب أي room.schemaLocation ومجلد app/schemas
+غير موجود ⇒ Room يرفض البناء في kaptDebugKotlin بـ:
+  error: Schema export directory was not provided to the annotation processor
+الأقل كسراً: تصدير المخطط بدل إطفاء exportSchema (مفيد أيضاً لمراجعات migration).
+
+مُتحقَّق: توازن الأقواس في الملفين، والكتلة في مستوى المشروع لا داخل android {}.
+غير مُتحقَّق: لا Gradle في بيئة العمل ⇒ أول بناء حقيقي يؤكد.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ apps/marketer/app/build.gradle.kts        | 8 ++++++++
+ apps/orders-delivery/app/build.gradle.kts | 8 ++++++++
+ 2 files changed, 16 insertions(+)
+
+diff --git a/apps/marketer/app/build.gradle.kts b/apps/marketer/app/build.gradle.kts
+index e8de2e8..fccd640 100644
+--- a/apps/marketer/app/build.gradle.kts
++++ b/apps/marketer/app/build.gradle.kts
+@@ -59,6 +59,14 @@ android {
+     }
+ }
+ 
++// Room: تصدير مخطط قاعدة البيانات ضروري لأن exportSchema=true — بلا room.schemaLocation يفشل kapt
++kapt {
++    correctErrorTypes = true
++    arguments {
++        arg("room.schemaLocation", "$projectDir/schemas")
++    }
++}
++
+ dependencies {
+     // Hilt DI
+     implementation("com.google.dagger:hilt-android:2.50")
+diff --git a/apps/orders-delivery/app/build.gradle.kts b/apps/orders-delivery/app/build.gradle.kts
+index 3c6f890..7432d7c 100644
+--- a/apps/orders-delivery/app/build.gradle.kts
++++ b/apps/orders-delivery/app/build.gradle.kts
+@@ -59,6 +59,14 @@ android {
+     }
+ }
+ 
++// Room: تصدير مخطط قاعدة البيانات ضروري لأن exportSchema=true — بلا room.schemaLocation يفشل kapt
++kapt {
++    correctErrorTypes = true
++    arguments {
++        arg("room.schemaLocation", "$projectDir/schemas")
++    }
++}
++
+ dependencies {
+     // Hilt DI
+     implementation("com.google.dagger:hilt-android:2.50")
+-- 
+2.39.5
+

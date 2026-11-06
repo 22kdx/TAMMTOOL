@@ -32,7 +32,9 @@ git clone https://github.com/22kdx/TAMMTOOL.git && cd TAMMTOOL
 | [`BUILD_GUIDE.md`](BUILD_GUIDE.md) | خطوة بخطوة: تجهيز الجهاز، التثبيت على كل نظام، البناء، التوقيع، الاختبار، CI |
 | [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | رسالة الخطأ ← السبب ← الحل (بما فيها حالة CI الحالية بالأدلة) |
 | [`scripts/README.md`](scripts/README.md) | مرجع أوامر كل سكربتات `scripts/` وخياراتها (منها `ci-logs.sh` لقراءة CI) |
+| [`GAP_TO_APK.md`](GAP_TO_APK.md) | **ما الذي ينقص لإنتاج التطبيق**: 16 فجوة في 3 طبقات (بناء · إصدار · وظيفة/سياسة) مع أمر إثبات وإصلاح ومالك لكل بند |
 | [`PLAY_STORE_RELEASE.md`](PLAY_STORE_RELEASE.md) | keystore، توقيع AAB/APK، R8/mapping، قائمة Play، وقوائم تحقق النشر |
+| [`patches/README.md`](patches/README.md) | رقع `git am` جاهزة (CI الصادق · ذاكرة Gradle · مخطط Room) + سجل التحقق |
 | [`AGENTS_STATUS.md`](AGENTS_STATUS.md) | حالة كل وكيل في فريق العمل، وما بقي قبل APK نهائي |
 | [`TEAM_COLLABORATION.md`](TEAM_COLLABORATION.md) | ملاحظات متقاطعة على ملفات الوكلاء الآخرين (مع أرقام مراجع قابلة للتحقق) |
 | `docs/workflow-*.md` | شرح سير عمل GitHub Actions (البناء، التوقيع، النشر) |

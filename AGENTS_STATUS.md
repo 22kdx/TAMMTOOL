@@ -19,7 +19,11 @@
 | **2 — الأدوات والسكريبتات** | `scripts/*.sh` | 🟡 تداخل مع الوكيل 3 | `arena/6b69a15d-tammtool` | 6 سكربتات؛ **`android-sdk-setup.sh` سطر 83 معطّل الصياغة**؛ `sign-apk.sh` يمرّر كلمات السر في argv |
 | **3 — التوثيق والتقارير** | وثائق + سكربتات البناء/الاختبار + قراءة CI | 🟢 **منجَز ومسلَّم** | `arena/68a3e358-tammtool` (HEAD `fe81f1c` فروع أخرى تتحرك) | `BUILD_GUIDE.md` · `TROUBLESHOOTING.md` · `scripts/README.md` · `build-apk.sh` v2.1 · `apk-test.sh` v2 · `ci-logs.sh` (جديد) · `tests/mock-smoke.sh` (89/89 ✓) |
 
-**الحالة الإجمالية للمشروع:** 🔴 لا APK من CI. المشكلتان مستقلتان ويجب إصلاحهما معاً:
+**الحالة الإجمالية للمشروع:** 🔴 لا APK من CI ولا بناء محلي موثَّق النجاح. قائمة الفجوات كاملة
+بطبقاتها وملاكها: [`GAP_TO_APK.md`](GAP_TO_APK.md) — وأهم بندٍ فيها لم يذكره أحد:
+**A1** `room.schemaLocation` مفقود مع `exportSchema=true` (فشل `kaptDebugKotlin` متوقع قبل موضوع
+الذاكرة، ورقعته جاهزة `patches/0003`)، وبند **C1**: `AuthViewModel.login()` لا يفحص كلمة المرور
+إطلاقاً في التطبيقين (يمنع النشر أكثر من أي خطأ بناء — §9 من `TEAM_COLLABORATION.md`). المشكلتان مستقلتان ويجب إصلاحهما معاً:
 **(أ)** نفاد ذاكرة Gradle (`Java heap space`) — سطرَان في `gradle.properties`؛
 **(ب)** الـ workflow يخفي الفشل (بناء بـ `set +e` + placeholder + `if-no-files-found: warn`) فلا يرى أحد أن البناء لم يُنتج شيئاً. الرقعتان جاهزتان في `TEAM_COLLABORATION.md` §0.3/§0.4.
 
@@ -40,7 +44,9 @@
 | 7 | `.gitignore` | استثناء `dist/` و`build-logs/` و`test-reports/` و`screenshots/` و`local.properties` ومفاتيح التوقيع | — |
 | 8 | `scripts/ci-logs.sh` (جديد) | قراءة نتائج Actions عبر `api.github.com` فقط: خطوات الـ run، الـ annotations، أحجام الـ artifacts، وحكم «أخضر زيف» + `--gate` كبوابة CI + `--json` | **اختُبر على المستودع الحقيقي**: أظهر `Java heap space` لـ run `42264822833` ووصف run `42267633951` بالزيف (153B) — `--gate` يرجع 1 |
 | 9 | `PLAY_STORE_RELEASE.md` (جديد) | مسار النشر: قرار AAB/APK، توليد keystore وقواعد عدم فقدانه، `signingConfig` مقابل `sign-apk.sh`، R8 و`mapping.txt`، `versionCode`، جدول قائمة Play Console، جدولة أخطاء التوقيع، وقائمة تحقق قبل Publish | مبني على `apps/*/build.gradle.kts` (versionCode 1 · minify true · **بلا signingConfig**) و`scripts/sign-apk.sh`؛ لم يوقَّع ملف فعلياً هنا (لا `keytool`/`apksigner`) — موثّق في §9 منه |
-| 10 | `build-apk.sh` v2.1 | إضافة قبول `TAMM_GRADLE_BIN=gradle` (اسم أمر، ليس مساراً) لتفادي توليد Wrapper في CI وتسريع التشغيل | shellcheck نظيف + mock-smoke 89/89 |
+| 10 | `patches/` (جديد) | رقعتان `git am`-ready لأساس `74f0a54` (0001 CI+sdk-setup، 0002 ذاكرة Gradle) + `0003` لأساس `8f92000` (Room schema) + `build-apk.yml.proposed` + `README.md` | طُبّقت بـ `git am` على أساسه في worktree نظيف: `bash -n` لـ `android-sdk-setup.sh` سليم، YAML صالح وكل خطوات `run` تمرّ بـ `bash -n`، و`jvmargs` في التطبيقين |
+| 11 | `GAP_TO_APK.md` (جديد) | إجابة «ما الذي ينقص لإنتاج التطبيق»: 16 بنداً في 3 طبقات (بناء · إصدار · وظيفة/سياسة) + ترتيب تنفيذ من 7 خطوات | كل بند بحجة أمر `git show`/`git grep` قابل للتكرار (القائمة في آخر الملف §6)؛ لم يُشغَّل Gradle — §6 يفرّق المستنتج من المرئي |
+| 12 | `build-apk.sh` v2.1 | إضافة قبول `TAMM_GRADLE_BIN=gradle` (اسم أمر، ليس مساراً) لتفادي توليد Wrapper في CI وتسريع التشغيل | shellcheck نظيف + mock-smoke 89/89 |
 
 **الكوميتات:** `b0cea60` (السكربتات + `BUILD_GUIDE.md`) + كوميت التوثيق الحالي على `arena/68a3e358-tammtool`.
 
@@ -162,6 +168,8 @@ APK نهائي: لا شيء — كل artifacts آخر تشغيلات إما plac
 | 2026-11-06 | 3 | `ci-logs.sh` مختبَر على 4 تشغيلات حقيقية (`--runs`/تقرير/`--json`/`--gate`) + إصلاح اكتشاف `owner/repo` من remote فيه token أو `.git` |
 | 2026-11-06 | 3 | تشخيص آخر 5 تشغيلات (`42268043333`…`42269164281`): «تشخيص إضافي ⇒ success في ~دقيقة بلا APK»؛ الحل سطر واحد مذكور في §0.1 |
 | 2026-11-06 | 3 | تصحيح ملاحظة §3: Compose Compiler 1.5.4 مع Kotlin 1.9.20 اقتران **صحيح** (كانت مُدرجة خطأً كعيب) |
+| 2026-11-06 | 3 | توليد `patches/0001`+`0002` من worktree على رأس فرع المنسّق `74f0a54`، والتحقق بـ `git am` + `bash -n` لكل خطوة + `yaml.safe_load` + اختبار بلوك الـ annotations على سجل نموذجي |
+| 2026-11-06 | 3 | «ما الذي ينقص لإنتاج التطبيق» → `GAP_TO_APK.md` (16 بنداً · 3 طبقات) + `patches/0003` لفجوة Room (على أساس `ff5110e8@8f92000`) + تقرير `TEAM_COLLABORATION.md` §9 للوكيل 1: `login()` لا يفحص كلمة المرور، `exportSchema` بلا `schemaLocation`، أذونات/إشعارات بلا كود، `allowBackup` كامل، قفل الاتجاه مع targetSdk 35 |
 
 ## ما يبقى قبل «APK نهائي» — ترتيب مقترح
 
@@ -175,5 +183,8 @@ APK نهائي: لا شيء — كل artifacts آخر تشغيلات إما plac
 | 6 | تنزيل APK من CI وفحصه بلا جهاز | 3 | `./scripts/apk-test.sh validate <apk>` = rc 0 |
 | 7 | اختبار حيّ على هاتف/محاكي (تثبيت/تشغيل/انهيار/لقطة) | 1 + 3 | `./scripts/apk-test.sh test --app marketer` = rc 0 مع تقرير في `test-reports/` |
 | 8 | توقيع الإنتاج: `bundle` + keystore خارج المستودع | 0 | keystore غير مرفوع + `apkanalyzer`/`apksigner verify` ✓ |
+| 9 | `git am patches/0003` (`room.schemaLocation`) — الفجوة A1 | 1 أو 0 | `:app:kaptDebugKotlin` يمرّ في أول بناء حقيقي |
+| 10 | إصلاح `AuthViewModel.login()` (تجزئة كلمة المرور) — الفجوة C1 / §9.1 | 1 | اختبار وحدة يفشل عند كلمة مرور خاطئة (`src/test` فارغ اليوم) |
+| 11 | تنظيف المانيفست: أذونات بلا كود + `dataExtractionRules` + قفل الاتجاه — §9.3/§9.4 | 1 | `aapt2 dump badging` يعرض الأذونات المستخدمة فقط |
 
 **لا يوجد أي عائق يمنع بدء 1 و2 اليوم** — لا يحتاجان JDK ولا جهاز، وكل ما فيهما نصّ جاهز في §0.

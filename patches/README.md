@@ -4,8 +4,9 @@
 > لا أملك `apps/` ولا `.github/`، فلا أكتب عليها مباشرة — أسلّمك رقوعاً **تم التحقق منها**
 > على رأس فرعك بالضبط، تنسخها بأمر واحد ثم تركّز على القرار.
 
-**الأساس (base):** `origin/arena/6b69a15d-tammtool` عند `74f0a54` — الرقع مُجرَّبة فوقه بـ `git am`
-ناجحاً (انظر «سجل التحقق» أسفل). إن تحرّك فرعك كثيراً، طبّق `git apply --3way` أو أعد توليد
+**الأساس (base):** `0001` و`0002` على `origin/arena/6b69a15d-tammtool` عند `74f0a54`، و`0003` على
+`origin/arena/ff5110e8-tammtool` عند `8f92000` (لأنه يلمس `apps/` الذي يملكه الوكيل 1) — كلها
+مُجرَّبة فوق أساسها بـ `git am` ناجحاً (سجل التحقق أسفل). إن تحرّك فرعك كثيراً، طبّق `git apply --3way` أو أعد توليد
 الفكرة يدوياً من `TEAM_COLLABORATION.md` §0.
 
 ---
@@ -13,7 +14,7 @@
 ## 0. طريقتان للتطبيق
 
 ```bash
-# ① من نفس فرعك (الأفضل): اجلب فرع الوكيل 3 وطبّق السلسلة
+# ① من نفس فرعك (الأفضل): اجلب فرع الوكيل 3 وطبّق السلسلة  (0003 يُطبَّق على فرع الكود لا هنا)
 git fetch origin arena/68a3e358-tammtool
 git checkout arena/6b69a15d-tammtool
 git am origin/arena/68a3e358-tammtool:patches/0001-ci-fail-on-real-errors-and-fix-sdk-setup.patch \
@@ -32,6 +33,7 @@ git commit -am "ci+build: apply agent-3 patches (fail-visible CI + gradle heap)"
 |---|---|---|---|
 | 0001 | `0001-ci-fail-on-real-errors-and-fix-sdk-setup.patch` | يجعل الـ workflow **يفشل بصوت مسموع** عند خطأ Gradle بدل الصمت، ويمنع الأثر الوهمي (153 بايت)، ويصلّح `android-sdk-setup.sh` المعطَّل | `.github/workflows/build-apk.yml`, `scripts/android-sdk-setup.sh` |
 | 0002 | `0002-apps-gradle-memory-heap-fix.patch` | `org.gradle.jvmargs=-Xmx3g` + كابت في عملية منفصلة — يزيل `Java heap space` (run `42264822833`) | `apps/marketer/gradle.properties`, `apps/orders-delivery/gradle.properties` |
+| 0003 | `0003-apps-room-schema-export.patch` | `room.schemaLocation` + `correctErrorTypes` للتطبيقين — يزيل فشل `kaptDebugKotlin` المتوقع (`exportSchema=true` بلا مجلد مخططات). **أساسه `origin/arena/ff5110e8-tammtool` @ `8f92000` لا فرعك** | `apps/*/app/build.gradle.kts` |
 | — | `build-apk.yml.proposed` | بديل **كامل** للـ workflow: matrix على التطبيقين، استخدام `scripts/build-apk.sh`، خطوة Gate ترفض «نجاح بلا APK»، رفع السجل كأثر لا commit | انسخه فوق `.github/workflows/build-apk.yml` |
 | — | `README.md` | هذا الشرح + سجل التحقق | — |
 
@@ -126,7 +128,9 @@ $ python3 -c "yaml.safe_load('.github/workflows/build-apk.yml')"        → OK �
 $ لكل خطوة run: bash -n <<<"$script"                                    → الكل سليم
 $ grep exit/"if-no-files-found: error"/"git add -f"/What went wrong      → موجودة كلها
 $ grep org.gradle.jvmargs=-Xmx3g apps/{marketer,orders-delivery}/gradle.properties → موجود
-$ تجرية بلوك الـ annotations على ci-build.log نموذجي → 7 تعليقات منها «Java heap space»
+$ تجربة بلوك الـ annotations على ci-build.log نموذجي → 7 تعليقات منها «Java heap space»
+$ 0003: توازن الأقواس في build.gradle.kts للتطبيقين (17/17) + كتلة kapt في مستوى المشروع ✓
+   (لم يُشغَّل Gradle: لا JDK هنا — أول assembleDebug يؤكد؛ التفاصيل GAP_TO_APK.md §6)
 ```
 
 — الوكيل 3 · فرع `arena/68a3e358-tammtool` · هذه الرقع مولّدة بـ `git format-patch` من نسخة عمل

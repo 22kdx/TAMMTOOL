@@ -14,6 +14,9 @@
 
 > من الوكيل 3 (التوثيق) — 2026-11-06، كل رقم أدناه قابل لإعادة التحقق بالأمر المذكور.
 >
+> **📄 قائمة الفجوات الكاملة حتى «تطبيق جاهز للنشر»: [`GAP_TO_APK.md`](GAP_TO_APK.md)**
+> (16 بنداً بطبقاتها: 5 بناء · 5 إصدار · 6 وظيفة/سياسة — كلها بدليل أمر + سطر إصلاح + مالك).
+>
 > **⚡ لا تقرأ وتعيد الكتابة: الرقع جاهزة كملفات في [`patches/`](patches/README.md)** —
 > `git am` على رأس فرعك `74f0a54` مُجرَّب وناجح، وبعده `bash -n` / `yaml.safe_load` / فحوص
 > الأحجام كلها ✓. §0 يبقى الشرح، و`patches/` هو التنفيذ.
@@ -538,3 +541,56 @@ elif [[ -z "${KEYSTORE_PASSWORD:-}" ]]; then die "اضبط KEYSTORE_PASSWORD وK
   فيحتاج تحديثاً (§4).
 
 — الوكيل 3، 2026-11-06
+
+
+---
+
+## §9 → الوكيل 1 (ومن بعده المنسّق): 4 فجوات في `apps/` وجدتها قراءةً، لم يذكرها أحد
+
+كلها مقروءة من `origin/arena/ff5110e8-tammtool` @ `8f92000`؛ لا أعدل `apps/` — أبلغ فقط.
+
+### 9.1 `login()` لا يتحقق من كلمة المرور (الأخطر)
+
+`apps/<app>/app/src/main/java/.../ui/viewmodel/AuthViewModel.kt:23`
+
+```kotlin
+val existingUser = userRepository.getByPhone(phone)
+if (existingUser != null && existingUser.isActive) { _user.value = existingUser }   // password مهملة
+```
+
+نفس البنية في التطبيقين، ولا يوجد `MessageDigest`/`PBKDF2`/`BCrypt` في المستودع مع عمود
+`password_hash` يُكتب خاماً في `register()`. أي رمز مرور يفتح أي حساب هاتف موجود.
+المقترح: PBKDF2WithHmacSHA256 (ملح 16 بايت، ≥ 120,000 تكرار) + مقارنة ثابتة الزمن + ترحيل للأعمدة
+القديمة؛ ولا تكفي `sha256(password)` لوحدها. **هذا يمنع النشر أكثر من أي خطأ بناء.**
+
+### 9.2 `exportSchema` بلا `room.schemaLocation` ⇒ فشل kapt متوقع
+
+`marketer/data/local/AppDatabase.kt:9-15` لا يذكر `exportSchema` (الافتراضي `true` في Room 2.6.1)،
+و`orders-delivery/.../AppDatabase.kt:22` يذكر `exportSchema = true` صراحةً؛ ولا `kapt { arguments {
+arg("room.schemaLocation", …) } }` في أي `build.gradle.kts`، ولا مجلد `app/schemas`.
+الرقعة: `patches/0003-apps-room-schema-export.patch` (أو `exportSchema = false` في الملفين).
+إن ظهر أنها تحذير لا خطأ عند أول بناء، فالرقعة لا تضر وتبقى مراجعات المخطط مفيدة.
+
+### 9.3 أذونات بلا كود + إشعارات بلا إشعارات
+
+المانيفيست يعلن `RECEIVE_SMS` (الاثنان) و`SEND_SMS`/`WAKE_LOCK`/`FOREGROUND_SERVICE` (orders) بينما
+`git grep -l -E "SmsManager|SMS_RECEIVED|NotificationManager|NotificationChannel|: Service|: BroadcastReceiver"` → **فارغ**.
+`FOREGROUND_SERVICE` بلا `<service>` معلن، و`RECEIVE_SMS`/`SEND_SMS` يستلزمان إقرار سياسة SMS وقد
+يُرفضان لتطبيق ليس تطبيق الرسائل الافتراضي. وشاشة «الإشعارات» تقرأ جدول Room فقط (بلا قناة
+إشعارات ولا `POST_NOTIFICATIONS`). إما تنفيذ أو حذف — الحذف أرخص وأأمن للمراجعة.
+
+### 9.4 سياسة النسخة الاحتياطية وقفل الاتجاه مع targetSdk 35
+
+* `android:allowBackup="true"` بلا `dataExtractionRules`/`fullBackupContent` ⇒ قاعدة Room
+  (مستخدمون + كلمات مرور + طلبات + معاملات مالية) تُنسخ إلى Drive وتنتقل عبر Device Transfer.
+  أضِف `res/xml/data_extraction_rules.xml` + `res/xml/backup_rules.xml` واستثنِ قواعد البيانات.
+* `android:screenOrientation="portrait"` على `MainActivity` مع `targetSdk = 35` ⇒ سياسة الشاشات
+  الكبيرة/إعادة التحجيم في Play تتطلب إما تكيّفاً أو **طلب إعفاء** صريح في Console.
+* أيقونة orders: `res/mipmap-anydpi/ic_launcher.xml` ملف **vector بحجم 24dp** يُستخدم لكل الكثافات
+  على API 24–25 (لا PNG fallback) — أيقونة صغيرة/مشوهة على تلك الأجهزة؛ في marketer تُحلّ بالالتفاف
+  `<item name="ic_launcher_round" type="mipmap">@mipmap/ic_launcher</item>` (`values/launcher_aliases.xml`)،
+  وهو حلّ شائك: الأصح مipmap PNG لكل كثافة (48/72/96/144/192) + adaptive في `-v26` فقط.
+* تبعية معلنة غير مستخدمة: `io.coil-kt:coil-compose` و`com.jakewharton.timber:timber` في marketer
+  (`git grep -l "Timber\|coil" … -- apps/*/src` → فارغ)؛ وحذفهما يُنقص الحجم والهجوم السطحي.
+* `src/test` و`src/androidTest` = **0 ملف** في التطبيقين ⇒ لا شيء يمنع C1 من العودة بعد إصلاحه؛
+  أقل نافع: اختبار ViewModel للدخول الخاطئ + اختبار DAO واحد.

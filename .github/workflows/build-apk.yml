@@ -24,22 +24,50 @@ jobs:
           java-version: 17
           distribution: temurin
 
+      - name: Install Android SDK
+        run: |
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
+
+          curl -L --fail --retry 3 --retry-delay 5 \
+            -o $HOME/android-sdk/cmdline-tools.zip \
+            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+
+          unzip -q -o $HOME/android-sdk/cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools/
+          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+          rm -f $HOME/android-sdk/cmdline-tools.zip
+
+          mkdir -p $HOME/android-sdk/licenses
+          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $HOME/android-sdk/licenses/android-sdk-license
+          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/android-sdk/licenses/android-sdk-license
+          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $HOME/android-sdk/licenses/android-sdk-preview-license
+          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/android-sdk/licenses/android-sdk-preview-license
+
+          echo "=== Installing Android packages ==="
+          yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --install \
+            "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+          echo "=== Installed packages ==="
+          $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --list-installed || true
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
           channel: 'stable'
 
-      - name: Install Android dependencies
+      - name: Configure Flutter for Android
         run: |
-          flutter doctor -v
           flutter config --enable-android
+          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+          flutter doctor -v
 
-      - name: Create local.properties for Flutter
+      - name: Create local.properties for Flutter Android
         working-directory: apps/flutter-app
         run: |
           echo "flutter.sdk=$HOME/flutter" > android/local.properties
-          echo "sdk.dir=$ANDROID_HOME" >> android/local.properties
+          echo "sdk.dir=$HOME/android-sdk" >> android/local.properties
           echo "=== local.properties ==="
           cat android/local.properties
 
@@ -48,23 +76,33 @@ jobs:
         run: |
           flutter pub get
 
-      - name: Build Flutter APK
+      - name: Build Flutter APK (verbose diagnostics)
         working-directory: apps/flutter-app
         env:
-          ANDROID_HOME: $ANDROID_HOME
+          ANDROID_HOME: $HOME/android-sdk
         run: |
           echo "=== BUILD START $(date) ===" > ci-build.log
+          echo "=== Environment ===" >> ci-build.log
+          echo "ANDROID_HOME=$ANDROID_HOME" >> ci-build.log
+          echo "JAVA_HOME=$JAVA_HOME" >> ci-build.log
+          echo "PATH=$PATH" >> ci-build.log
+          echo "" >> ci-build.log
           echo "=== Flutter doctor ===" >> ci-build.log
           flutter doctor -v >> ci-build.log 2>&1
+          echo "" >> ci-build.log
           echo "=== Running flutter build apk ===" >> ci-build.log
           set +e
           set -o pipefail
-          flutter build apk --debug --split-per-abi --verbose 2>&1 | tee -a ci-build.log
+          flutter build apk --debug --verbose 2>&1 | tee -a ci-build.log
           BUILD_EXIT=$?
           set +o pipefail
           echo "=== BUILD EXIT CODE: $BUILD_EXIT ===" | tee -a ci-build.log
-          echo "=== Build output directory ===" | tee -a ci-build.log
-          find build -type f -name "*.apk" 2>/dev/null | tee -a ci-build.log || echo "No APK files found in build directory" | tee -a ci-build.log
+          echo "" >> ci-build.log
+          echo "=== APK files in build directory ===" | tee -a ci-build.log
+          find build -name "*.apk" -type f 2>/dev/null | tee -a ci-build.log || echo "No APK files found" | tee -a ci-build.log
+          echo "" >> ci-build.log
+          echo "=== All files in build directory ===" | tee -a ci-build.log
+          find build -type f 2>/dev/null | head -50 | tee -a ci-build.log || echo "No files in build directory" | tee -a ci-build.log
           echo "BUILD_EXIT=$BUILD_EXIT" >> $GITHUB_ENV
 
       - name: Upload build log as artifact

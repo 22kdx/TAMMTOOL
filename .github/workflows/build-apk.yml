@@ -63,41 +63,24 @@ jobs:
           flutter config --android-sdk $HOME/android-sdk
           echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
 
-      - name: Verify Android SDK tools
+      - name: Accept Android licenses
         run: |
-          echo "=== Disk space ==="
-          df -h /
-          echo ""
-          echo "=== Memory ==="
-          free -m
-          echo ""
+          echo "y" | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          flutter doctor --android-licenses || true
+
+      - name: Verify environment
+        run: |
           echo "=== Java version ==="
           java -version 2>&1 || true
           echo ""
           echo "=== ANDROID_HOME ==="
           echo "$ANDROID_HOME"
           echo ""
-          echo "=== SDK directory listing ==="
-          ls -la $HOME/android-sdk/ || true
-          echo ""
-          echo "=== Platform tools ==="
-          ls -la $HOME/android-sdk/platform-tools/ 2>/dev/null || echo "No platform-tools"
-          $HOME/android-sdk/platform-tools/adb version 2>/dev/null || echo "adb not found"
-          echo ""
-          echo "=== Build tools ==="
-          ls -la $HOME/android-sdk/build-tools/ 2>/dev/null || echo "No build-tools"
-          $HOME/android-sdk/build-tools/35.0.0/aapt version 2>/dev/null || echo "aapt not found"
-          echo ""
-          echo "=== Platforms ==="
-          ls -la $HOME/android-sdk/platforms/ 2>/dev/null || echo "No platforms"
+          echo "=== Flutter version ==="
+          flutter --version
           echo ""
           echo "=== Flutter doctor ==="
           flutter doctor -v
-
-      - name: Accept Android licenses
-        run: |
-          echo "y" | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          flutter doctor --android-licenses || true
 
       - name: Create local.properties for Flutter Android
         working-directory: apps/flutter-app
@@ -117,38 +100,28 @@ jobs:
         run: |
           flutter clean
 
-      - name: Build Flutter APK (verbose diagnostics)
+      - name: Build Flutter APK (debug)
         working-directory: apps/flutter-app
         env:
-          ANDROID_HOME: $HOME/android-sdk
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
         run: |
           echo "=== BUILD START $(date) ===" > ci-build.log
           echo "=== Environment ===" >> ci-build.log
           echo "ANDROID_HOME=$ANDROID_HOME" >> ci-build.log
           echo "JAVA_HOME=$JAVA_HOME" >> ci-build.log
-          echo "PATH=$PATH" >> ci-build.log
           echo "" >> ci-build.log
           echo "=== Flutter doctor ===" >> ci-build.log
           flutter doctor -v >> ci-build.log 2>&1
           echo "" >> ci-build.log
           echo "=== Running flutter build apk ===" >> ci-build.log
-          set +e
-          set -o pipefail
           flutter build apk --debug --verbose 2>&1 | tee -a ci-build.log
-          BUILD_EXIT=$?
-          set +o pipefail
-          echo "=== BUILD EXIT CODE: $BUILD_EXIT ===" | tee -a ci-build.log
           echo "" >> ci-build.log
-          echo "=== APK files in build directory ===" | tee -a ci-build.log
-          find build -name "*.apk" -type f 2>/dev/null | tee -a ci-build.log || echo "No APK files found" | tee -a ci-build.log
-          echo "" >> ci-build.log
-          echo "=== All files in build directory ===" | tee -a ci-build.log
-          find build -type f 2>/dev/null | head -50 | tee -a ci-build.log || echo "No files in build directory" | tee -a ci-build.log
-          echo "BUILD_EXIT=$BUILD_EXIT" >> $GITHUB_ENV
+          echo "=== APK files in build directory ===" >> ci-build.log
+          find build -name "*.apk" -type f 2>/dev/null | tee -a ci-build.log || echo "No APK files found" >> ci-build.log
+          echo "BUILD_COMPLETED=true" >> $GITHUB_ENV
 
       - name: Upload build log as artifact
         if: always()
-        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: flutter-ci-build-log
@@ -156,34 +129,27 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      - name: Find and upload APK artifact
-        if: always()
-        continue-on-error: true
+      - name: Find APK and verify existence
+        working-directory: apps/flutter-app
         run: |
-          set +e
-          echo "=== ci-build.log content ==="
-          cat apps/flutter-app/ci-build.log 2>/dev/null || echo "ci-build.log not found"
-          echo ""
           echo "=== Searching for APK files ==="
-          find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
-          echo ""
-          echo "=== Uploading APK artifact ==="
-          APK_PATH=$(find . -name "*.apk" -type f 2>/dev/null | head -1)
+          APK_PATH=$(find build -name "*.apk" -type f 2>/dev/null | head -1)
           if [[ -n "$APK_PATH" ]]; then
             echo "Found APK: $APK_PATH"
-            mkdir -p apk-output
-            cp "$APK_PATH" apk-output/app-debug.apk
+            echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
+            echo "APK_FOUND=true" >> $GITHUB_ENV
           else
-            echo "No APK was built, creating placeholder"
-            mkdir -p apk-output
-            echo "No APK was built" > apk-output/no-apk.txt
+            echo "ERROR: No APK file found in build directory"
+            echo "=== Build directory contents ==="
+            find build -type f 2>/dev/null | head -50 || echo "No files in build directory"
+            echo "APK_FOUND=false" >> $GITHUB_ENV
             exit 1
           fi
+
       - name: Upload APK artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: flutter-app-apk
-          path: apk-output/
+          path: ${{ env.APK_PATH }}
           retention-days: 30
-          if-no-files-found: warn
+          if-no-files-found: error

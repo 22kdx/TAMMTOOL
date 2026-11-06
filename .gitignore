@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ─────────────────────────────────────────────────────────────
 # TAMMTOOL — ما لا يجب أن يصل إلى git
 # (مخرجات البناء المحلي الذي تنتجه سكربتات scripts/)
@@ -49,3 +50,103 @@ Thumbs.db
 
 # مخرجات جانبية لـ scripts/ci-logs.sh (تقرير CI المحلي)
 *-annotations.tsv
+=======
+# Android / Gradle
+*.apk
+*.aab
+*.apks
+*.keystore
+*.jks
+*.keys
+/local.properties
+/.gradle/
+/build/
+/app/build/
+*.iml
+.idea/
+*.iws
+*.ipr
+*.class
+*.jar
+*.war
+*.ear
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+*.swp
+*.swo
+~*
+
+# Fastlane
+/fastlane/report.xml
+/fastlane/Preview.html
+/fastlane/screenshots
+/fastlane/test_output
+
+# Firebase
+/.google-services.json
+
+# Secrets / environment
+.env
+.env.local
+*.secret
+
+# OS generated files
+*.log
+
+# Apps build outputs
+/apps/*/build/
+/apps/*/.gradle/
+/apps/*/local.properties
+
+# Android SDK (installed by scripts/android-sdk-setup.sh)
+/android-sdk/
+/$HOME/android-sdk/
+android-sdk/
+
+# APK/AAB outputs
+*.apk
+*.aab
+*.apks
+
+# Keystore / signing
+*.keystore
+*.jks
+*.keys
+>>>>>>> origin/arena/ff5110e8-tammtool
+
+# ── قواعد أُضيفت من فرع الكود (ff5110e8) أثناء الدمج ──────────────────────────
+*.class
+*.ear
+*.war
+*.keys
+*.swo
+~*
+.DS_Store
+.AppleDouble
+.LSOverride
+Desktop.ini
+Thumbs.db
+ehthumbs.db
+
+# مجلدات أدوات/تنزيلات محلية
+/.gradle/
+.gradle/
+android-sdk/
+/local.properties
+
+# fastlane (إن أُضيف لاحقاً)
+/fastlane/report.xml
+/fastlane/Preview.html
+/fastlane/screenshots
+/fastlane/test_output

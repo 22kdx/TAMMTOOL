@@ -1,0 +1,93 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
+package com.tammtool.marketerapp.ui.screens
+
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.Alignment
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.tammtool.marketerapp.data.model.MarketerOrder
+import com.tammtool.marketerapp.ui.theme.MarketerTheme
+import com.tammtool.marketerapp.ui.viewmodel.OrderViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
+
+@Composable
+fun OrderDetailScreen(
+    viewModel: OrderViewModel = hiltViewModel(),
+    orderId: Int,
+    onBack: () -> Unit
+) {
+    val order = remember { mutableStateOf<MarketerOrder?>(null) }
+    val loading by viewModel.loading.observeAsState(initial = false)
+
+    if (!loading && order.value == null) {
+        viewModel.loadAllOrders()
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopAppBar(
+            title = { Text("تفاصيل الطلب") },
+            colors = TopAppBarDefaults.mediumTopAppBarColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            ),
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "رجوع")
+                }
+            }
+        )
+
+        if (loading) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+        } else {
+            val currentOrder = order.value
+            if (currentOrder != null) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(16.dp)
+                ) {
+                    Text(
+                        text = "طلب #${currentOrder.orderNumber}",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    DetailRow(label = "اسم العميل", value = currentOrder.customerName)
+                    DetailRow(label = "الهاتف", value = currentOrder.customerPhone)
+                    DetailRow(label = "المحافظة", value = currentOrder.governorate)
+                    DetailRow(label = "العنوان", value = currentOrder.address)
+                    DetailRow(label = "المنتج", value = currentOrder.product)
+                    DetailRow(label = "الكمية", value = "${currentOrder.quantity}")
+                    DetailRow(label = "السعر المتفق عليه", value = "${currentOrder.agreedPrice} ريال")
+                    DetailRow(label = "عمولتك", value = "${currentOrder.marketerCommission} ريال")
+                    DetailRow(label = "المبلغ المحصل", value = "${currentOrder.amountCollected} ريال")
+                    DetailRow(label = "الحالة", value = currentOrder.status.name)
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(0.5f)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.W500)
+        )
+    }
+}

@@ -1,0 +1,121 @@
+From e910a1c55b11caf144bb601d90bf2f96ed2d4ed0 Mon Sep 17 00:00:00 2001
+From: agent-3-docs <agent-3@arena.local>
+Date: Fri, 6 Nov 2026 18:22:13 +0000
+Subject: [PATCH 1/2] =?UTF-8?q?ci:=20=D9=84=D8=A7=20=D9=86=D8=AC=D8=A7?=
+ =?UTF-8?q?=D8=AD=20=D8=A8=D9=84=D8=A7=20APK=20=E2=80=94=20=D8=A7=D9=81?=
+ =?UTF-8?q?=D8=B4=D9=84=20=D8=A7=D9=84=D9=80=20job=20=D8=B9=D9=86=D8=AF=20?=
+ =?UTF-8?q?=D8=AE=D8=B7=D8=A3=20Gradle=20+=20=D8=A3=D8=B5=D9=84=D8=AD=20an?=
+ =?UTF-8?q?droid-sdk-setup?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+workflow:
+- خطوة البناء كانت set +e وتكتب BUILD_EXIT في $GITHUB_ENV دون فحص ⇒ run أخضر
+  بلا APK (runs 42267633951 / 42268790783 / 42269164281). الآن ::error::
+  annotations من ci-build.log (تُقرأ عبر API حين يُحجب السجل الخام) ثم exit.
+- خطوة البحث: لا placeholder no-apk.txt بحجم 153 بايت؛ if-no-files-found: error.
+- خطوة السجل: git add -f لأن .gitignore:52 (*.log) كان يُفشل الإضافة بصمت.
+
+scripts/android-sdk-setup.sh:
+- سطر 83 فيه بقايا «<<<<>>>» ⇒ syntax error يُسقط الملف كاملاً وCI يستدعيه.
+- سطر 181 تعليق بكورية دخيلة → عربية؛ سطر 225 'síesno' → 'sdkmanager'.
+
+مُتحقَّق: YAML يصح وكل خطوة run تمرّ بـ bash -n، والملف المصلَّح bash -n + shellcheck نظيف.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .github/workflows/build-apk.yml | 25 ++++++++++++++++++++-----
+ scripts/android-sdk-setup.sh    |  6 +++---
+ 2 files changed, 23 insertions(+), 8 deletions(-)
+
+diff --git a/.github/workflows/build-apk.yml b/.github/workflows/build-apk.yml
+index 7337633..fbe334f 100644
+--- a/.github/workflows/build-apk.yml
++++ b/.github/workflows/build-apk.yml
+@@ -85,6 +85,21 @@ jobs:
+           find app/build -type f 2>/dev/null | head -30 >> ci-build.log || echo "No build output files found" >> ci-build.log
+           echo "BUILD_EXIT=$BUILD_EXIT" >> $GITHUB_ENV
+ 
++          # ── تصحيح الوكيل 3: لا تبتلع الفشل ────────────────────────────────
++          # كان BUILD_EXIT يُكتب في $GITHUB_ENV وحده، فلا تفشل الـ job أبداً،
++          # وتُقرأ النتيجة «success» بلا APK. الآن: annotations (تُقرأ عبر API
++          # حتى لو حُجب السجل الخام) ثم تمرير رمز الخروج.
++          echo "::notice::BUILD_EXIT=$BUILD_EXIT"
++          if [[ "$BUILD_EXIT" != "0" ]]; then
++            { awk '/^\* What went wrong:/{f=1} /^\* Try:/{f=0} f' ci-build.log
++              grep -nE '^(e: |> Task .* FAILED|Caused by:)' ci-build.log
++              grep -nEi 'heap space|OutOfMemory|error:' ci-build.log
++            } 2>/dev/null | awk 'NF && !seen[$0]++' | head -40 | sed -e 's/%/%25/g' -e 's/^/::error::/' || true
++            tail -n 250 ci-build.log || true
++            echo "::error::فشل Gradle برمز $BUILD_EXIT — راجع BUILD_GUIDE.md §6 وTEAM_COLLABORATION.md §0.3"
++            exit "$BUILD_EXIT"
++          fi
++
+       - name: Save build log to repository (always)
+         if: always()
+         continue-on-error: true
+@@ -111,7 +126,8 @@ jobs:
+           cd ..
+           git config user.name "github-actions[bot]"
+           git config user.email "github-actions[bot]@users.noreply.github.com"
+-          git add apps/marketer/ci-build.log
++          # ‎.gitignore يتجاهل *.log ⇒ git add العادي يفشل بصمت (سبب «COMMIT FAILED»)
++          git add -f apps/marketer/ci-build.log
+           git commit -m "CI build log from run ${{ github.run_id }} (exit: ${{ env.BUILD_EXIT }})" || echo "COMMIT FAILED"
+           git push origin arena/6b69a15d-tammtool || echo "PUSH FAILED - continuing anyway"
+           echo "Save log step completed (non-critical)"
+@@ -144,9 +160,8 @@ jobs:
+               mkdir -p apk-output
+               cp "$ANY_APK" apk-output/app-debug.apk
+             else
+-              echo "No APK was built, creating placeholder"
+-              mkdir -p apk-output
+-              echo "No APK was built" > apk-output/no-apk.txt
++              echo "::error::لم يُنتَج أي APK — تفشل الخطوة بدل placeholder بحجم 153 بايت"
++              exit 1
+             fi
+           fi
+       - name: Upload APK artifact
+@@ -156,4 +171,4 @@ jobs:
+           name: afghani-orders-apk
+           path: apk-output/
+           retention-days: 30
+-          if-no-files-found: warn
+\ No newline at end of file
++          if-no-files-found: error
+\ No newline at end of file
+diff --git a/scripts/android-sdk-setup.sh b/scripts/android-sdk-setup.sh
+index 42667a8..6d5460b 100755
+--- a/scripts/android-sdk-setup.sh
++++ b/scripts/android-sdk-setup.sh
+@@ -80,7 +80,7 @@ echo "============================================="
+ echo "مسار التثبيت: $ANDROID_HOME"
+ echo "إصدار أدوات سطر الأوامر: $CMDLINE_TOOLS_VERSION"
+ echo "النظام الأساسي: $PLATFORM_VERSION"
+-<<<<>>> echo "أدوات البناء: $BUILD_TOOLS_VERSION"
++echo "أدوات البناء: $BUILD_TOOLS_VERSION"
+ echo ""
+ 
+ # ============================================================
+@@ -178,7 +178,7 @@ mkdir -p "$TEMP_DIR"
+ 
+ unzip -q -o "$ZIP_PATH" -d "$TEMP_DIR"
+ 
+-# 명령라인 tools يأتي ضمن مجلد cmdline-tools داخل الـ zip
++# تأتي أدوات سطر الأوامر داخل مجلد cmdline-tools داخل الـ zip
+ # ننقل محتوياته إلى latest
+ if [[ -d "$TEMP_DIR/cmdline-tools" ]]; then
+   mv "$TEMP_DIR/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+@@ -222,7 +222,7 @@ echo "الحزم: $PACKAGES"
+ for package in $PACKAGES; do
+   log_info "جاري تثبيت: $package"
+   if ! yes | sdkmanager "$package" > /dev/null 2>&1; then
+-    log_warn "فشل تثبيت $package عبر síesno، نحاول قبول الترخيص تلقائياً..."
++    log_warn "فشل تثبيت $package عبر sdkmanager، نحاول قبول الترخيص تلقائياً..."
+     echo "y" | sdkmanager "$package" || true
+   fi
+ done
+-- 
+2.39.5
+

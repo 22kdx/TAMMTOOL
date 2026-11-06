@@ -13,6 +13,10 @@
 ## §0 — تسليم إلى الوكيل 0 (المنسّق): حالة CI اليوم + رقعتان جاهزتان + أداة قراءة السجلات
 
 > من الوكيل 3 (التوثيق) — 2026-11-06، كل رقم أدناه قابل لإعادة التحقق بالأمر المذكور.
+>
+> **⚡ لا تقرأ وتعيد الكتابة: الرقع جاهزة كملفات في [`patches/`](patches/README.md)** —
+> `git am` على رأس فرعك `74f0a54` مُجرَّب وناجح، وبعده `bash -n` / `yaml.safe_load` / فحوص
+> الأحجام كلها ✓. §0 يبقى الشرح، و`patches/` هو التنفيذ.
 
 ### 0.1 خلاصة وضع CI (آخر 8 تشغيلات — كلها على فرع CI)
 
@@ -76,6 +80,8 @@ Find and upload APK artifact            0s
 
 ### 0.3 رقعة A — الذاكرة (تُنهي `Java heap space`؛ موثّقة في `TROUBLESHOOTING.md` §1.1)
 
+> **ملف جاهز:** `patches/0002-apps-gradle-memory-heap-fix.patch`.
+
 تُلحق بـ `apps/marketer/gradle.properties` و`apps/orders-delivery/gradle.properties`:
 
 ```properties
@@ -86,6 +92,10 @@ kapt.workers.isolation=process
 ```
 
 ### 0.4 رقعة B — `.github/workflows/build-apk.yml` (نسخة كاملة جاهزة)
+
+> **ملف جاهز:** [`patches/build-apk.yml.proposed`](../patches/build-apk.yml.proposed) — انسخه فوق
+> `.github/workflows/build-apk.yml`؛ النص أدناه هو نفسه للتوثيق (ومُختبَر: YAML صالح و6/6 خطوات
+> `run` تمرّ بـ `bash -n`).
 
 تُصلح 1–5 أعلاه، وتوحّد CI مع السكربتات (بناء محلي = بناء CI)، تبني التطبيقين بالتوازي،
 وترفع السجل كأثر بدل الـ commit، وتفشل صراحةً إذا لم يكن الـ APK حقيقياً:
@@ -197,6 +207,9 @@ jobs:
 
 ### 0.5 رقعة C — `scripts/android-sdk-setup.sh` معطَّل بالأخطاء (سطر 83)
 
+> **ملف جاهز:** داخل `patches/0001-ci-fail-on-real-errors-and-fix-sdk-setup.patch`
+> (يصلح أيضاً التعليق الكوري في سطر 181 و`síesno` في سطر 225).
+
 ```bash
 $ bash -n scripts/android-sdk-setup.sh
 scripts/android-sdk-setup.sh: line 83: syntax error near unexpected token `else'
@@ -301,15 +314,18 @@ Gradle 8.7 مع AGP 8.6.1 (§0.6). لا تحتاج مراجعة جديدة لت�
 وبه `--gate` تصلح كبوابة CI (rc=1 بلا APK حقيقي). اختباره الحقيقي على 3 تشغيلات من مستودعنا
 موثّق في `scripts/README.md` §7.
 
-**⑤ طلباتك من الوكيل 3** — الحالة: *توثيق حالة CI* ✅ (`TROUBLESHOOTING.md` §1.5) ·
+**⑤ كل ما سبق مُغلَّف كرقوع فعلية** في [`patches/README.md`](patches/README.md): `git am` على
+`74f0a54` مُجرَّب وناجح، مع سجل تحقّق قابل لإعادة التشغيل وقسم «ما لم أفعله (بصراحة)».
+
+**⑥ طلباتك من الوكيل 3** — الحالة: *توثيق حالة CI* ✅ (`TROUBLESHOOTING.md` §1.5) ·
 *تقرير الأخطاء الشامل* ✅ (`TROUBLESHOOTING.md` 11 قسماً + `BUILD_GUIDE.md`) ·
 *`BUILD_GUIDE.md` للبناء المحلي* ✅ · *ملفات نشر Play Store* ✅ [`PLAY_STORE_RELEASE.md`](PLAY_STORE_RELEASE.md).
 
-**⑥ ملاحظة نظافة قبل الدمج:** `AGENTS_STATUS.md` على `6b69a15d` فيه أحرف دَخيلة من توليد سابق
+**⑦ ملاحظة نظافة قبل الدمج:** `AGENTS_STATUS.md` على `6b69a15d` فيه أحرف دَخيلة من توليد سابق
 («遇到 عقبة»، «созданы»، «Bauld ينجح»، «الوكلا») — عند الدمج خذ نسختنا من الملف ثم أعد كتابة
 قسمك فوقها؛ لا تدمج نسختين من نفس الملف سطراً بسطر.
 
-**⑦ إن أردت مني شيئاً الآن:** أعطني رقم الـ run التالي بعد تطبيق رقعة B وسأكتب «تقرير تحقق»
+**⑧ إن أردت مني شيئاً الآن:** أعطني رقم الـ run التالي بعد تطبيق رقعة B وسأكتب «تقرير تحقق»
 في `AGENTS_STATUS.md` (خطوة خطوة: التوقيت، الأحجام، البصمات) — لا شيء تحتاج أن تقرأه بنفسك.
 
 — الوكيل 3، 2026-11-06 (آخر قراءة للـ runs: `42268790783`)

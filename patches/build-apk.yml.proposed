@@ -1,0 +1,92 @@
+name: Build Android APKs
+
+on:
+  push:
+    branches: ['arena/**', 'main']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false        # لا نُلغي تشغيلات نحن بصددها للقراءة
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [marketer, orders-delivery]
+    env:
+      ANDROID_HOME: ${{ github.workspace }}/android-sdk
+      TAMM_GRADLE_BIN: gradle      # يستخدم Gradle المُثبّت في الـ runner (توفير ~2 دقيقة)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK
+        run: ./scripts/android-sdk-setup.sh --sdk-dir "$ANDROID_HOME" --accept-licenses
+
+      - name: Install Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Self-test the build tooling first
+        run: bash scripts/tests/mock-smoke.sh | tail -5
+
+      - name: Build debug APK (same code path as local)
+        run: ./scripts/build-apk.sh debug ${{ matrix.app }} --no-daemon --yes
+
+      - name: Static-validate the APK (no emulator)
+        run: ./scripts/apk-test.sh validate --app ${{ matrix.app }}
+
+      # لا نجاح مضلَّل: إن لم يكن هناك APK بحجم منطقي يفشل الـ job ولو كانت كل الخطوات ✓
+      - name: Gate — a real APK must exist
+        run: |
+          apk="$(ls -1t dist/*.apk 2>/dev/null | head -1 || true)"
+          [ -n "$apk" ] || { echo "::error::لا يوجد أي APK في dist/ رغم نجاح البناء"; exit 1; }
+          size="$(stat -c %s "$apk")"
+          [ "$size" -gt 1000000 ] || { echo "::error::حجم APK غير منطقي ($size بايت): $apk"; exit 1; }
+          echo "artifact: $apk ($size bytes)"
+
+      # طوق النجأة عند حجب السجل الخام: كل سطر خطأ يصبح annotation مرئياً عبر API
+      - name: Annotate build errors (always, non-fatal)
+        if: always()
+        continue-on-error: true
+        run: |
+          log="$(ls -1t build-logs/*.log 2>/dev/null | head -1 || true)"
+          [ -n "$log" ] || { echo "لا سجل بناء"; exit 0; }
+          echo "=== tail $log ==="
+          tail -n 250 "$log" || true
+          { awk '/^\* What went wrong:/{f=1} /^\* Try:/{f=0} f' "$log"
+            grep -nE '^(e: |> Task .* FAILED|Caused by:)' "$log"
+            grep -nEi 'heap space|OutOfMemory|error:' "$log"
+          } 2>/dev/null | awk 'NF && !seen[$0]++' | head -40 | sed -e 's/%/%25/g' -e 's/^/::error::/' || true
+
+      - name: Upload APK artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-debug-apk
+          path: dist/*.apk
+          if-no-files-found: error          # لا placeholder
+          retention-days: 30
+
+      - name: Upload build log (never commits to the branch)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-build-log
+          path: build-logs/
+          if-no-files-found: warn
+          retention-days: 7

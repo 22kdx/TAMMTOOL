@@ -1,0 +1,60 @@
+From da476b4a4502540bbbaa2e89ac6012eba48034a7 Mon Sep 17 00:00:00 2001
+From: agent-3-docs <agent-3@arena.local>
+Date: Fri, 6 Nov 2026 18:22:13 +0000
+Subject: [PATCH 2/2] =?UTF-8?q?build(apps):=20org.gradle.jvmargs=20=D9=84?=
+ =?UTF-8?q?=D8=AF=D8=B1=D8=A1=20Java=20heap=20space=20=D9=81=D9=8A=20CI?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+run 42264822833 annotation: [.github:69] Java heap space أثناء :app:checkKotlinGradlePluginConfigurationErrors
+لأن apps/*/gradle.properties لا يضبط ذاكرة Gradle/kapt على runner بـ 7GB.
+
+- org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g
+- kotlin.daemon.jvm.options=-Xmx1536m + kapt في عملية منفصلة
+- parallel + build cache (تسريع الدمج المتتابع للتطبيقين)
+
+لأجهزة أضعف: ./scripts/build-apk.sh debug <app> --low-memory
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+(cherry picked from commit d52e3111fed83d4ef762d38087917bc992b91f1d)
+---
+ apps/marketer/gradle.properties        | 8 ++++++++
+ apps/orders-delivery/gradle.properties | 8 ++++++++
+ 2 files changed, 16 insertions(+)
+
+diff --git a/apps/marketer/gradle.properties b/apps/marketer/gradle.properties
+index 0695add..8b1f44a 100644
+--- a/apps/marketer/gradle.properties
++++ b/apps/marketer/gradle.properties
+@@ -1,3 +1,11 @@
+ android.useAndroidX=true
+ android.enableJetifier=true
+ kotlin.code.style=official
++
++# ── تصحيح الوكيل 3/الوكيل 1: CI كان يفشل بـ «Java heap space» ──────────────
++org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
++kotlin.daemon.jvm.options=-Xmx1536m
++kapt.use.worker.api=true
++kapt.workers.isolation=process
++org.gradle.parallel=true
++org.gradle.caching=true
+diff --git a/apps/orders-delivery/gradle.properties b/apps/orders-delivery/gradle.properties
+index 0695add..8b1f44a 100644
+--- a/apps/orders-delivery/gradle.properties
++++ b/apps/orders-delivery/gradle.properties
+@@ -1,3 +1,11 @@
+ android.useAndroidX=true
+ android.enableJetifier=true
+ kotlin.code.style=official
++
++# ── تصحيح الوكيل 3/الوكيل 1: CI كان يفشل بـ «Java heap space» ──────────────
++org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
++kotlin.daemon.jvm.options=-Xmx1536m
++kapt.use.worker.api=true
++kapt.workers.isolation=process
++org.gradle.parallel=true
++org.gradle.caching=true
+-- 
+2.39.5
+

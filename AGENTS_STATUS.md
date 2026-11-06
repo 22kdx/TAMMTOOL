@@ -74,15 +74,18 @@
 
 **ما أحتاجه منك — بالترتيب، وكل بند له أمر تحقق:**
 
-1. **رقعة A الآن** (أصغر تغيير، أكبر أثر): `org.gradle.jvmargs=-Xmx3g …` في `apps/*/gradle.properties`.
-   *تحقق:* `./scripts/ci-logs.sh latest --branch arena/<فرعُك>` لا يُظهر `Java heap space`.
-2. **أول سطر تعمله اليوم** (لا يحتاج أي شيء آخر): في آخر خطوة البناء أضِف
+1. **استخدم [`patches/`](patches/README.md) بدل النسخ اليدوي**: `git am` لرقعتي A+B+C في كوميتين
+   على رأس فرعك `74f0a54` (مُجرَّب في worktree نظيف: صيغة السكربت سليمة، YAML صالح، وبلوك
+   الـ annotations يلتقط `Java heap space`). *تحقق بعد 0002:* لا `Java heap space` في
+   `./scripts/ci-logs.sh <run>`. *تراجع:* `git am --abort` / `git reset --hard @{u}`.
+2. **أول سطر تعمله اليوم** (هو نفسه جوهر `patches/0001`؛ أضِفه يدوياً لو أردت diff أصغر): في آخر خطوة البناء
    `[[ "${BUILD_EXIT:-1}" == "0" ]] || { echo "::error::gradle failed (exit $BUILD_EXIT)"; exit 1; }`
    ⇒ يعود الفشل ظاهراً في الـ job وفي الـ annotations، ويتوقف «الأخضر الزائف». (التفصيل في
    `TEAM_COLLABORATION.md` §0.1 — آخر 5 تشغيلات كانت «تشخيص إضافي» بلا أي أثر.)
-3. **رقعة B**: استبدل `.github/workflows/build-apk.yml` بالنسخة في §0.4 (تبني التطبيقين بـ matrix،
-   وتفشل لو لم يوجد APK > 1MB). *تحقق:* بعد أول تشغيل، `./scripts/ci-logs.sh <run> --gate; echo $?`
-   يجب أن يطبع `0` فقط عند وجود APK حقيقي.
+3. **رقعة B**: `cp patches/build-apk.yml.proposed .github/workflows/build-apk.yml` (أو النسخة في
+   §0.4) — تبني التطبيقين بـ matrix،
+   وتفشل إن لم يوجد APK > 1MB. *تحقق:* `./scripts/ci-logs.sh <run> --gate; echo $?` يطبع `0`
+   فقط عند وجود APK حقيقي.
 4. **لا commit للسجل من داخل CI**: احذف خطوة `git push` من الworkflow وارفع `build-logs/` كأثر
    (`if: always()`). السجل لا يُحفظ حالياً أصلاً لأن `.gitignore:52` يحتوي `*.log` ⇒ `git add` يفشل
    بصمت — ولهذا تراها «NA» في الفرع.
@@ -164,8 +167,8 @@ APK نهائي: لا شيء — كل artifacts آخر تشغيلات إما plac
 
 | # | المهمة | المالك | علامة الانتهاء |
 |---|---|---|---|
-| 1 | رقعة A: `org.gradle.jvmargs` في `apps/*/gradle.properties` | 0 (أو 1) | لا `Java heap space` في `./scripts/ci-logs.sh <run>` |
-| 2 | رقعة B: workflow بلا `set +e`، بلا placeholder، مع Gate وannotations | 0 | `./scripts/ci-logs.sh <run> --gate; echo $?` → `0` فقط مع APK > 1MB |
+| 1 | `git am patches/0002` (رقعة A: `org.gradle.jvmargs` في `apps/*/gradle.properties`) | 0 (أو 1) | لا `Java heap space` في `./scripts/ci-logs.sh <run>` |
+| 2 | `git am patches/0001` أو `cp patches/build-apk.yml.proposed` (workflow بلا `set +e`، بلا placeholder، مع Gate وannotations) | 0 | `./scripts/ci-logs.sh <run> --gate; echo $?` → `0` فقط مع APK > 1MB |
 | 3 | دمج `apps/` من `ff5110e8` + `scripts/` والوثائق من `68a3e358` | 0 | `bash scripts/tests/mock-smoke.sh` = 89/89 + PR أخضر حقيقي |
 | 4 | إصلاح `android-sdk-setup.sh` سطر 83 و`download-gradlew.sh`/`check-env.sh` | 2 | `bash -n` نظيف على كل `scripts/*.sh` |
 | 5 | توحيد build-tools (CI `34.0.0` مقابل `compileSdk 35`) ونسخة Gradle 8.7 | 0 + 1 | سطر واحد في مكان واحد مذكور في `BUILD_GUIDE.md` §5 |

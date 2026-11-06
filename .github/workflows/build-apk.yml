@@ -76,12 +76,41 @@ jobs:
 
           gradle --version
 
+      - name: Environment check
+        working-directory: apps/marketer
+        env:
+          ANDROID_HOME: $HOME/android-sdk
+        run: |
+          echo "=== JAVA_HOME ==="
+          echo "$JAVA_HOME"
+          echo ""
+          echo "=== ANDROID_HOME ==="
+          echo "$ANDROID_HOME"
+          echo ""
+          echo "=== Java version ==="
+          java -version 2>&1
+          echo ""
+          echo "=== Gradle version ==="
+          gradle --version 2>&1
+          echo ""
+          echo "=== SDK dirs ==="
+          ls -la $ANDROID_HOME/ 2>&1 || echo "ANDROID_HOME dir not found"
+          echo ""
+          echo "=== local.properties ==="
+          cat local.properties 2>&1 || echo "local.properties not found"
+          echo ""
+          echo "=== Files in apps/marketer ==="
+          ls -la
+          echo ""
+          echo "=== Files in apps/marketer/app ==="
+          ls -la app/
+
       - name: Create local.properties
         working-directory: apps/marketer
         run: |
           echo "sdk.dir=$HOME/android-sdk" > local.properties
 
-      - name: Build Debug APK - save log to file
+      - name: Build Debug APK - save log always
         working-directory: apps/marketer
         env:
           ANDROID_HOME: $HOME/android-sdk
@@ -92,16 +121,24 @@ jobs:
           gradle :app:assembleDebug --stacktrace --info > $GITHUB_WORKSPACE/ci-build.log 2>&1
           BUILD_EXIT=$?
           echo "=== Gradle build exit code: $BUILD_EXIT ==="
-          exit $BUILD_EXIT
+          echo "BUILD_EXIT=$BUILD_EXIT" >> $GITHUB_ENV
 
-      - name: Save build log to repository
-        if: failure()
+      - name: Save build log to repository (always)
+        if: always()
         run: |
           cd $GITHUB_WORKSPACE
+          if [[ -f ci-build.log ]]; then
+            echo "=== ci-build.log exists, size: $(wc -c < ci-build.log) bytes ==="
+            echo "=== Last 20 lines ==="
+            tail -20 ci-build.log
+          else
+            echo "ci-build.log NOT FOUND"
+            echo "NO BUILD OUTPUT" > ci-build.log
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add ci-build.log
-          git commit -m "Add CI build log from run ${{ github.run_id }}" || true
+          git commit -m "CI build log from run ${{ github.run_id }} (exit: ${{ env.BUILD_EXIT }})" || true
           git push origin arena/6b69a15d-tammtool || true
 
       - name: Upload APK artifact

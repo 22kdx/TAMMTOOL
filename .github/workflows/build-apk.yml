@@ -1,4 +1,4 @@
-name: Build Afghani Orders APK
+name: Build Flutter APK
 
 on:
   push:
@@ -24,76 +24,47 @@ jobs:
           java-version: 17
           distribution: temurin
 
-      - name: Install Android SDK (Manual via curl)
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+
+      - name: Install Android dependencies
         run: |
-          mkdir -p $HOME/android-sdk/cmdline-tools
-          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
+          flutter doctor -v
+          flutter config --enable-android
 
-          curl -L --fail --retry 3 --retry-delay 5 \
-            -o $HOME/android-sdk/cmdline-tools.zip \
-            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-
-          unzip -q -o $HOME/android-sdk/cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools/
-          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
-          rm -f $HOME/android-sdk/cmdline-tools.zip
-
-          mkdir -p $HOME/android-sdk/licenses
-          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $HOME/android-sdk/licenses/android-sdk-license
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/android-sdk/licenses/android-sdk-license
-          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $HOME/android-sdk/licenses/android-sdk-preview-license
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/android-sdk/licenses/android-sdk-preview-license
-
-          yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --install \
-            "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-
-          echo "=== Installed SDK packages ==="
-          $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --list-installed || echo "sdkmanager --list-installed failed"
-
-          $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --version
-
-      - name: Create local.properties
-        working-directory: apps/marketer
+      - name: Create local.properties for Flutter
+        working-directory: apps/flutter-app
         run: |
-          echo "sdk.dir=$HOME/android-sdk" > local.properties
+          echo "flutter.sdk=$HOME/flutter" > android/local.properties
+          echo "sdk.dir=$ANDROID_HOME" >> android/local.properties
           echo "=== local.properties ==="
-          cat local.properties
+          cat android/local.properties
 
-      - name: Verify local.properties exists
-        working-directory: apps/marketer
+      - name: Get Flutter dependencies
+        working-directory: apps/flutter-app
         run: |
-          if [[ -f local.properties ]]; then
-            echo "local.properties EXISTS"
-            cat local.properties
-          else
-            echo "local.properties MISSING - creating now"
-            echo "sdk.dir=$HOME/android-sdk" > local.properties
-          fi
+          flutter pub get
 
-      - name: Build Debug APK - capture output
-        working-directory: apps/marketer
+      - name: Build Flutter APK
+        working-directory: apps/flutter-app
         env:
-          ANDROID_HOME: $HOME/android-sdk
+          ANDROID_HOME: $ANDROID_HOME
         run: |
-          echo "=== SDK DIRECTORY ==="
-          ls -la $HOME/android-sdk/
-          echo "=== SDK Platforms ==="
-          ls -la $HOME/android-sdk/platforms/ 2>/dev/null || echo "No platforms dir"
-          echo "=== SDK Build Tools ==="
-          ls -la $HOME/android-sdk/build-tools/ 2>/dev/null || echo "No build-tools dir"
-          echo ""
           echo "=== BUILD START $(date) ===" > ci-build.log
-          echo "JAVA_HOME=$JAVA_HOME" >> ci-build.log
-          echo "ANDROID_HOME=$ANDROID_HOME" >> ci-build.log
-          echo "=== RUNNING GRADLEW ===" >> ci-build.log
+          echo "=== Flutter doctor ===" >> ci-build.log
+          flutter doctor -v >> ci-build.log 2>&1
+          echo "=== Running flutter build apk ===" >> ci-build.log
           set +e
           set -o pipefail
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace --info --debug 2>&1 | tee -a ci-build.log
+          flutter build apk --debug --split-per-abi --verbose 2>&1 | tee -a ci-build.log
           BUILD_EXIT=$?
           set +o pipefail
           echo "=== BUILD EXIT CODE: $BUILD_EXIT ===" | tee -a ci-build.log
-          echo "=== Build output directory contents ===" | tee -a ci-build.log
-          find app/build -type f 2>/dev/null | head -50 | tee -a ci-build.log || echo "No build output files found" | tee -a ci-build.log
+          echo "=== Build output directory ===" | tee -a ci-build.log
+          find build -type f -name "*.apk" 2>/dev/null | tee -a ci-build.log || echo "No APK files found in build directory" | tee -a ci-build.log
           echo "BUILD_EXIT=$BUILD_EXIT" >> $GITHUB_ENV
 
       - name: Upload build log as artifact
@@ -101,41 +72,10 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: marketer-ci-build-log
-          path: apps/marketer/ci-build.log
+          name: flutter-ci-build-log
+          path: apps/flutter-app/ci-build.log
           retention-days: 30
           if-no-files-found: warn
-
-      - name: Save build log to repository (always)
-        if: always()
-        continue-on-error: true
-        working-directory: apps/marketer
-        run: |
-          echo "=== Current directory ==="
-          pwd
-          echo "=== Files in current directory ==="
-          ls -la
-          echo ""
-          echo "=== ci-build.log check ==="
-          if [[ -f ci-build.log ]]; then
-            echo "ci-build.log EXISTS, size: $(wc -c < ci-build.log) bytes"
-            echo "=== Content ==="
-            cat ci-build.log
-          else
-            echo "ci-build.log NOT FOUND in apps/marketer"
-            echo "Checking parent directory..."
-            ls -la ../ci-build.log 2>/dev/null || echo "Not in parent either"
-            echo "Searching for ci-build.log..."
-            find . -name "ci-build.log" -type f 2>/dev/null || echo "Not found anywhere"
-            echo "NO BUILD OUTPUT" > ci-build.log
-          fi
-          cd ..
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add apps/marketer/ci-build.log
-          git commit -m "CI build log from run ${{ github.run_id }} (exit: ${{ env.BUILD_EXIT }})" || echo "COMMIT FAILED"
-          git push origin arena/6b69a15d-tammtool || echo "PUSH FAILED - continuing anyway"
-          echo "Save log step completed (non-critical)"
 
       - name: Find and upload APK artifact
         if: always()
@@ -143,39 +83,28 @@ jobs:
         run: |
           set +e
           echo "=== ci-build.log content ==="
-          cat apps/marketer/ci-build.log 2>/dev/null || echo "ci-build.log not found"
-          echo ""
-          echo "=== Build directory structure ==="
-          find apps/marketer/app/build -type f 2>/dev/null | head -50 || echo "No build directory found"
+          cat apps/flutter-app/ci-build.log 2>/dev/null || echo "ci-build.log not found"
           echo ""
           echo "=== Searching for APK files ==="
-          find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
+          find apps/flutter-app/build -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
           echo ""
           echo "=== Uploading APK artifact ==="
-          APK_PATH=$(find . -name "app-debug.apk" -type f 2>/dev/null | head -1)
+          APK_PATH=$(find apps/flutter-app/build -name "*.apk" -type f 2>/dev/null | head -1)
           if [[ -n "$APK_PATH" ]]; then
             echo "Found APK: $APK_PATH"
             mkdir -p apk-output
             cp "$APK_PATH" apk-output/app-debug.apk
           else
-            echo "No app-debug.apk found, checking for any APK..."
-            ANY_APK=$(find . -name "*.apk" -type f 2>/dev/null | head -1)
-            if [[ -n "$ANY_APK" ]]; then
-              echo "Found APK: $ANY_APK"
-              mkdir -p apk-output
-              cp "$ANY_APK" apk-output/app-debug.apk
-            else
-              echo "No APK was built, creating placeholder"
-              mkdir -p apk-output
-              echo "No APK was built" > apk-output/no-apk.txt
-              exit 1
-            fi
+            echo "No APK was built, creating placeholder"
+            mkdir -p apk-output
+            echo "No APK was built" > apk-output/no-apk.txt
+            exit 1
           fi
       - name: Upload APK artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: afghani-orders-apk
+          name: flutter-app-apk
           path: apk-output/
           retention-days: 30
           if-no-files-found: warn

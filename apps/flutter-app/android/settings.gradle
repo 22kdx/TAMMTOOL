@@ -1,0 +1,33 @@
+include ':app'
+
+def localPropertiesFile = new File(rootProject.projectDir, 'local.properties')
+def properties = new Properties()
+if (localPropertiesFile.exists()) {
+    properties.load(localPropertiesFile.newDataInputStream())
+    localPropertiesFile.withReader('UTF-8') { reader -> properties.load(reader) }
+}
+
+def flutterSdkPath = properties.getProperty('flutter.sdk')
+if (flutterSdkPath == null) {
+    throw GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
+}
+
+apply from: "$flutterSdkPath/packages/flutter_tools/gradle/app_plugin_loader.gradle"
+
+android {
+    compileSdkVersion 35
+
+    defaultConfig {
+        applicationId "com.tammtool.filterapp"
+        minSdkVersion 24
+        targetSdkVersion 35
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
+        }
+    }
+}
